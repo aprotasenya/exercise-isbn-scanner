@@ -5,6 +5,7 @@ Minimal local web page: enter or scan (camera) an ISBN, see book info, rating an
 ## Commands
 - Run: `python3 -m http.server 8000`, then open http://localhost:8000 (ES modules don't load over `file://`)
 - Test: `npm test` (Node's built-in `node:test`, no network; `fetch` is mocked)
+- Verify UI changes in a real browser with `/verify-app` (needs the Playwright MCP from `.mcp.json`)
 
 ## Constraints
 - Data comes only from Open Library (no API key). Google Books was dropped: anonymous quota exhausted and frequent 503s/empty results. Don't reintroduce it, or any key/`config.js`.
