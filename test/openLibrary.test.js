@@ -6,6 +6,7 @@ import {
   fetchBookByIsbn,
   fetchOtherBooksByAuthor,
   retry,
+  unknownBook,
 } from '../src/openLibrary.js';
 import isbns from './fixtures/isbns.json' with { type: 'json' };
 
@@ -205,3 +206,14 @@ test('ISBNs that Open Library lacks resolve to null (empty data answer, 404 edit
     assert.equal(await fetchBookByIsbn(isbn), null, isbn);
   }
 });
+
+test('unknownBook is a card-ready placeholder for an ISBN Open Library lacks', () => {
+  const book = unknownBook('9786171299412');
+  assert.equal(book.title, 'ISBN 9786171299412');
+  assert.deepEqual(book.authors, []);
+  assert.equal(book.authorKey, null); // so no "More by…" lookup is attempted
+  assert.equal(book.thumbnail, null);
+  assert.equal(book.unknown, true);
+  assert.equal(book.id, null);
+});
+

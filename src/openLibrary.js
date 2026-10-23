@@ -52,6 +52,24 @@ export function parseBook({ data, workId, work, ratings }) {
   };
 }
 
+// What the card shows for a valid ISBN that Open Library does not know.
+export function unknownBook(isbn) {
+  return {
+    id: null,
+    title: `ISBN ${isbn}`,
+    authors: [],
+    authorKey: null,
+    publisher: null,
+    publishedDate: null,
+    description: null,
+    pageCount: null,
+    thumbnail: null,
+    averageRating: null,
+    ratingsCount: null,
+    unknown: true,
+  };
+}
+
 // `current` is the book being viewed; it is excluded by work id and by title, since
 // Open Library sometimes holds duplicate work records for the same title.
 export function parseOtherBooks(json, current, limit = 5) {

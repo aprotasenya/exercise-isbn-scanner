@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isbnFromBarcode, loadZxing } from '../src/scanner.js';
+import { createDedupe, isbnFromBarcode, loadZxing } from '../src/scanner.js';
 
 test('accepts book EAN-13 barcodes (978 and 979)', () => {
   assert.equal(isbnFromBarcode('9780747532699'), '9780747532699');
@@ -68,4 +68,23 @@ test('a bundle that does not define the global is rejected, not cached', async (
   await assert.rejects(fresh.loadZxing(), /did not define ZXingBrowser/);
   assert.equal(scripts.size, 0);
   assert.deepEqual(await fresh.loadZxing(), { ok: true });
+});
+
+test('createDedupe reports a repeat within the window and renews it on every sighting', () => {
+  let t = 0;
+  const isDuplicate = createDedupe(3000, () => t);
+  assert.equal(isDuplicate('a'), false);
+  t = 1000;
+  assert.equal(isDuplicate('a'), true);
+  t = 3500; // 2500 ms after the last sighting: still the same sighting run
+  assert.equal(isDuplicate('a'), true);
+  t = 7000; // out of view for 3500 ms
+  assert.equal(isDuplicate('a'), false);
+});
+
+test('createDedupe tracks each key separately', () => {
+  const isDuplicate = createDedupe(3000, () => 0);
+  assert.equal(isDuplicate('a'), false);
+  assert.equal(isDuplicate('b'), false);
+  assert.equal(isDuplicate('a'), true);
 });

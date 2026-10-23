@@ -38,3 +38,12 @@ test('a tampered over-long list is cut to the limit', () => {
   assert.equal(recent.list().length, 10);
 });
 
+test('rename changes a chip title and ignores unknown ISBNs', () => {
+  const recent = createRecent(memoryStore());
+  recent.add({ isbn: '1', title: 'ISBN 1' });
+  recent.add({ isbn: '2', title: 'Two' });
+  recent.rename('1', 'My book');
+  recent.rename('9', 'Nobody');
+  assert.deepEqual(recent.list(), [{ isbn: '2', title: 'Two' }, { isbn: '1', title: 'My book' }]);
+});
+

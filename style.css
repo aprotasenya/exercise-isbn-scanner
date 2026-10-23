@@ -34,8 +34,9 @@ main { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .top h1 { margin: 0 0 1rem; }
 #theme { margin-bottom: 1rem; font-size: .9rem; }
-form { display: flex; gap: .5rem; }
-input { flex: 1; padding: .5rem; font-size: 1rem; }
+form { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+#isbn { flex: 1 1 12rem; padding: .5rem; font-size: 1rem; }
+.keep { display: flex; align-items: center; gap: .3rem; font-size: .9rem; white-space: nowrap; }
 button { padding: .5rem 1rem; font-size: 1rem; }
 .recent { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .75rem; }
 .recent[hidden] { display: none; }
@@ -51,3 +52,13 @@ button { padding: .5rem 1rem; font-size: 1rem; }
 .description { white-space: pre-line; }
 .store-links { margin-top: 1rem; }
 .others { margin-top: 1rem; }
+.mark-toggle { margin-top: .5rem; }
+.marked { margin-top: 1.5rem; background: var(--card); padding: .75rem 1rem; border-radius: 8px; }
+.marked summary { cursor: pointer; font-weight: 600; }
+.marked ul { list-style: none; margin: .5rem 0; padding: 0; }
+.marked li { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; padding: .35rem 0; }
+.marked li .meta { flex: 1; margin: 0; }
+.marked .open { padding: 0; border: 0; background: none; color: var(--link); font: inherit; text-align: left; text-decoration: underline; cursor: pointer; }
+.marked .open:disabled { color: var(--muted); cursor: default; }
+.marked-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.name-input { display: block; box-sizing: border-box; width: 100%; max-width: 24rem; margin: .4rem 0; padding: .35rem .5rem; font-size: .95rem; }

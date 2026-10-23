@@ -19,3 +19,22 @@ export function createListStore(storage, key) {
     },
   };
 }
+
+// A remembered on/off setting (stored as "1"; "off" stores nothing).
+export function readFlag(storage, key) {
+  try {
+    return storage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function writeFlag(storage, key, value) {
+  try {
+    if (value) storage.setItem(key, '1');
+    else storage.removeItem(key);
+  } catch {
+    // storage blocked: the setting just won't persist
+  }
+}
+

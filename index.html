@@ -25,6 +25,12 @@
       <input id="isbn" type="text" placeholder="ISBN, e.g. 978-0-14-032872-1" autocomplete="off" autofocus>
       <button type="submit">Search</button>
       <button type="button" id="scan">Scan</button>
+      <label class="keep" title="Mark every scanned book automatically, so the Mark button is not needed">
+        <input type="checkbox" id="auto-mark"> Auto-mark
+      </label>
+      <label class="keep" title="Keep the camera on and mark each book as it is scanned (needs Auto-mark)">
+        <input type="checkbox" id="keep-scanning"> Keep scanning
+      </label>
     </form>
     <div id="recent" class="recent" hidden></div>
     <div id="scanner" hidden>
@@ -33,6 +39,16 @@
     </div>
     <p id="status" role="status"></p>
     <section id="result"></section>
+    <details id="marked" class="marked">
+      <summary>Marked (<span id="marked-count">0</span>)</summary>
+      <p id="marked-empty" class="meta">Nothing marked yet. Press "Mark" on a book, or turn on "Auto-mark" and scan some barcodes.</p>
+      <ul id="marked-list"></ul>
+      <div class="marked-actions">
+        <button type="button" id="copy-marked">Copy list</button>
+        <button type="button" id="download-marked">Download JSON</button>
+        <button type="button" id="clear-marked">Clear</button>
+      </div>
+    </details>
   </main>
   <script type="module" src="src/app.js"></script>
 </body>
