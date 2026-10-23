@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ISBN Reader</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>ISBN Reader</h1>
+    <form id="search">
+      <input id="isbn" type="text" placeholder="ISBN, e.g. 978-0-14-032872-1" autocomplete="off" autofocus>
+      <button type="submit">Search</button>
+    </form>
+    <p id="status" role="status"></p>
+    <section id="result"></section>
+  </main>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
