@@ -12,7 +12,12 @@
     <form id="search">
       <input id="isbn" type="text" placeholder="ISBN, e.g. 978-0-14-032872-1" autocomplete="off" autofocus>
       <button type="submit">Search</button>
+      <button type="button" id="scan">Scan</button>
     </form>
+    <div id="scanner" hidden>
+      <video id="preview" playsinline muted></video>
+      <p class="meta">Point the camera at the barcode on the back cover. Can't scan? Stop the camera and type the ISBN.</p>
+    </div>
     <p id="status" role="status"></p>
     <section id="result"></section>
   </main>

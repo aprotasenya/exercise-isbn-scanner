@@ -3,6 +3,8 @@ main { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
 form { display: flex; gap: .5rem; }
 input { flex: 1; padding: .5rem; font-size: 1rem; }
 button { padding: .5rem 1rem; font-size: 1rem; }
+#scanner { margin-top: 1rem; }
+#preview { display: block; width: 100%; max-height: 50vh; background: #000; border-radius: 8px; }
 #status { min-height: 1.5em; color: #555; }
 #status.error { color: #b00020; }
 .book { display: flex; gap: 1rem; background: #fff; padding: 1rem; border-radius: 8px; }
