@@ -10,15 +10,20 @@ export function isbnFromBarcode(text) {
 let zxingLoaded;
 
 // The barcode library is large, so it is only fetched when scanning is first requested.
-function loadZxing() {
+export function loadZxing() {
   zxingLoaded ??= new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = 'vendor/zxing-browser.min.js';
-    script.onload = () => resolve(globalThis.ZXingBrowser);
-    script.onerror = () => {
-      zxingLoaded = undefined; // allow a retry on the next Scan press
-      reject(new Error('Could not load the barcode library'));
+    // On failure, drop the tag and the cached promise so the next Scan press retries cleanly.
+    const fail = (message) => {
+      script.remove();
+      zxingLoaded = undefined;
+      reject(new Error(message));
     };
+    script.onload = () => (globalThis.ZXingBrowser
+      ? resolve(globalThis.ZXingBrowser)
+      : fail('Barcode library loaded but did not define ZXingBrowser'));
+    script.onerror = () => fail('Could not load the barcode library');
     document.head.append(script);
   });
   return zxingLoaded;

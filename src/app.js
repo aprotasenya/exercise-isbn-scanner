@@ -153,7 +153,8 @@ async function openScanner() {
     });
     if (token === scanToken) stopCamera = stop;
     else stop();
-  } catch {
+  } catch (err) {
+    console.error('Could not start the scanner:', err);
     if (token !== scanToken) return;
     closeScanner();
     setStatus('Camera unavailable. Type the ISBN instead.', true);
