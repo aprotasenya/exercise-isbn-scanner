@@ -1,6 +1,7 @@
 import { isValidIsbn, normalizeIsbn } from './isbn.js';
 import { fetchBookByIsbn, fetchOtherBooksByAuthor } from './openLibrary.js';
 import { descriptionToText } from './text.js';
+import { storeSearchLinks } from './storeLinks.js';
 
 const form = document.getElementById('search');
 const input = document.getElementById('isbn');
@@ -24,6 +25,23 @@ function formatRating(book) {
   if (book.averageRating == null) return 'No rating available';
   const count = book.ratingsCount != null ? ` (${book.ratingsCount} ratings)` : '';
   return `★ ${book.averageRating}${count}`;
+}
+
+function renderNotFound(isbn) {
+  const box = el('div', null, 'not-found');
+  box.append(el('p', 'Not in Open Library. Try searching this ISBN on:', 'meta'));
+  const list = el('ul');
+  for (const { name, url } of storeSearchLinks(isbn)) {
+    const link = el('a', name);
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    const item = el('li');
+    item.append(link);
+    list.append(item);
+  }
+  box.append(list);
+  result.replaceChildren(box);
 }
 
 function renderBook(book) {
@@ -77,7 +95,10 @@ form.addEventListener('submit', async (event) => {
   let book;
   try {
     book = await fetchBookByIsbn(isbn);
-    if (!book) return setStatus('Book not found.', true);
+    if (!book) {
+      setStatus('Book not found.', true);
+      return renderNotFound(isbn);
+    }
   } catch {
     return setStatus('Could not reach Open Library. Please try again.', true);
   } finally {

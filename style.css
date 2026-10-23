@@ -10,4 +10,7 @@ button { padding: .5rem 1rem; font-size: 1rem; }
 .book h2 { margin: 0 0 .25rem; }
 .meta { color: #555; margin: .25rem 0; }
 .description { white-space: pre-line; }
+.not-found { background: #fff; padding: 1rem; border-radius: 8px; }
+.not-found p { margin-top: 0; }
+.not-found ul { margin-bottom: 0; }
 .others { margin-top: 1rem; }
