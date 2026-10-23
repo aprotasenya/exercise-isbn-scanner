@@ -27,24 +27,21 @@ function formatRating(book) {
   return `★ ${book.averageRating}${count}`;
 }
 
-function renderNotFound(isbn) {
-  const box = el('div', null, 'not-found');
-  box.append(el('p', 'Not in Open Library. Try searching this ISBN on:', 'meta'));
-  const list = el('ul');
-  for (const { name, url } of storeSearchLinks(isbn)) {
+function storeLinksBlock(isbn) {
+  const block = el('p', 'Search this ISBN on ', 'store-links meta');
+  storeSearchLinks(isbn).forEach(({ name, url }, i) => {
+    if (i > 0) block.append(', ');
     const link = el('a', name);
     link.href = url;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    const item = el('li');
-    item.append(link);
-    list.append(item);
-  }
-  box.append(list);
-  result.replaceChildren(box);
+    block.append(link);
+  });
+  block.append('.');
+  return block;
 }
 
-function renderBook(book) {
+function renderBook(book, isbn) {
   const card = el('article', null, 'book');
   if (book.thumbnail) {
     const img = el('img');
@@ -63,7 +60,7 @@ function renderBook(book) {
   const others = el('div', null, 'others');
   body.append(others);
   card.append(body);
-  result.replaceChildren(card);
+  result.replaceChildren(card, storeLinksBlock(isbn));
   return others;
 }
 
@@ -97,7 +94,7 @@ form.addEventListener('submit', async (event) => {
     book = await fetchBookByIsbn(isbn);
     if (!book) {
       setStatus('Book not found.', true);
-      return renderNotFound(isbn);
+      return result.replaceChildren(storeLinksBlock(isbn));
     }
   } catch {
     return setStatus('Could not reach Open Library. Please try again.', true);
@@ -108,5 +105,5 @@ form.addEventListener('submit', async (event) => {
   // Not awaited: the book is already shown, so the form is usable while this loads.
   // If another search replaced the card meanwhile, the container is detached and the
   // late result is simply never displayed.
-  renderOthers(renderBook(book), book);
+  renderOthers(renderBook(book, isbn), book);
 });
