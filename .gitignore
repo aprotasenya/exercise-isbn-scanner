@@ -6,7 +6,8 @@
 ._*
 
 # Custom folder icons
-Icon
+Icon
+
 
 # Volume root files
 .DocumentRevisions-V100
@@ -30,3 +31,8 @@ Icon
 
 # Built Visual Studio Code Extensions
 *.vsix
+
+### Tooling
+node_modules/
+# Playwright MCP output (screenshots, snapshots, logs)
+.playwright-mcp/
