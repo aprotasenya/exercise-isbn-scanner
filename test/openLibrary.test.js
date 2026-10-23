@@ -7,6 +7,7 @@ import {
   fetchOtherBooksByAuthor,
   retry,
 } from '../src/openLibrary.js';
+import isbns from './fixtures/isbns.json' with { type: 'json' };
 
 retry.delayMs = 0;
 
@@ -195,4 +196,12 @@ test('every request carries a timeout signal', async (t) => {
   const mock = mockFetch(t, [['/search.json', { docs: [] }]]);
   await fetchOtherBooksByAuthor('OL23919A', current);
   assert.ok(mock.mock.calls[0].arguments[1].signal instanceof AbortSignal);
+});
+
+test('ISBNs that Open Library lacks resolve to null (empty data answer, 404 edition)', async (t) => {
+  for (const { isbn } of isbns.notFoundInOpenLibrary) {
+    t.mock.restoreAll();
+    mockFetch(t, [['/api/books', {}], [`/isbn/${isbn}.json`, null]]);
+    assert.equal(await fetchBookByIsbn(isbn), null, isbn);
+  }
 });

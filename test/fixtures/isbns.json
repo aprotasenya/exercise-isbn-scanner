@@ -1,0 +1,124 @@
+{
+  "checkedOn": "2026-10-23",
+  "about": "ISBNs for tests that need several books. `found` resolve in Open Library (titles as it returned them; they can change). `notFoundInOpenLibrary` are valid ISBNs of Ukrainian books that Ereadian has and Open Library lacks (the app shows 'Book not found.' and the Ereadian link). `invalid` fail the ISBN check. Use them in order, e.g. the first 11 `found` plus invalid[0] as the 6th search for the recent-chips test. If one stops resolving as described, report it instead of swapping it silently.",
+  "found": [
+    {
+      "isbn": "9780747532699",
+      "title": "Harry Potter and the Philosopher's Stone",
+      "note": "has a rating and 5 other Rowling books"
+    },
+    {
+      "isbn": "9780141365466",
+      "title": "Matilda"
+    },
+    {
+      "isbn": "9780140328721",
+      "title": "Fantastic Mr. Fox"
+    },
+    {
+      "isbn": "9789664480892",
+      "title": "Московіада",
+      "note": "Ukrainian; no rating, no description"
+    },
+    {
+      "isbn": "9786178024055",
+      "title": "Радіо ніч",
+      "note": "Ukrainian; has a description, no rating"
+    },
+    {
+      "isbn": "9780606186513",
+      "title": "Pride and Prejudice"
+    },
+    {
+      "isbn": "9788477026709",
+      "title": "Alicia en el País de las Maravillas",
+      "note": "Spanish"
+    },
+    {
+      "isbn": "9780831712983",
+      "title": "A Christmas carol"
+    },
+    {
+      "isbn": "9781973876953",
+      "title": "Picture of Dorian Gray (illustrated)"
+    },
+    {
+      "isbn": "9781986499415",
+      "title": "Wuthering Heights"
+    },
+    {
+      "isbn": "9781719520867",
+      "title": "Adventures of Huckleberry Finn"
+    },
+    {
+      "isbn": "080442957X",
+      "title": "The tales of Henry James",
+      "note": "ISBN-10 with an X check digit; no rating"
+    },
+    {
+      "isbn": "9781537211381",
+      "title": "Scarlet Letter"
+    },
+    {
+      "isbn": "9798711861386",
+      "title": "Robinson Crusoe",
+      "note": "979 prefix"
+    },
+    {
+      "isbn": "9789650100650",
+      "title": "Hamleṭ nesikh Denmarḳ",
+      "note": "Hebrew edition"
+    }
+  ],
+  "notFoundInOpenLibrary": [
+    {
+      "isbn": "9786171299412",
+      "title": "Хроніки Буресвітла. Шлях королів. Книга 1",
+      "note": "Ereadian: 1 книжка"
+    },
+    {
+      "isbn": "9789661092999",
+      "title": "Центральна станція",
+      "note": "Ereadian: 1 книжка"
+    },
+    {
+      "isbn": "9789664485149",
+      "title": "Бджолине жало",
+      "note": "from the Ereadian book page"
+    },
+    {
+      "isbn": "9786175231531",
+      "title": "Minecraft. Посібник з виживання",
+      "note": "mixed Latin and Cyrillic title; from the Ereadian book page"
+    },
+    {
+      "isbn": "9786175223987",
+      "title": "Доґґерланд. Сніговерть. Книга 2",
+      "note": "title with Ґ; from the Ereadian book page"
+    },
+    {
+      "isbn": "9786177925193",
+      "title": "Залюднена планета. Як нас стало сім мільярдів",
+      "note": "long non-fiction title; from the Ereadian book page"
+    },
+    {
+      "isbn": "9789664482155",
+      "title": "Різдвяний Бука",
+      "note": "children's book; from the Ereadian book page"
+    }
+  ],
+  "invalid": [
+    {
+      "isbn": "1234567890",
+      "note": "bad ISBN-10 checksum; rejected before any request"
+    },
+    {
+      "isbn": "9780747532698",
+      "note": "ISBN-13 with a wrong check digit"
+    },
+    {
+      "isbn": "abc",
+      "note": "not digits"
+    }
+  ]
+}

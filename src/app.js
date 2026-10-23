@@ -3,6 +3,10 @@ import { fetchBookByIsbn, fetchOtherBooksByAuthor } from './openLibrary.js';
 import { descriptionToText } from './text.js';
 import { storeSearchLinks } from './storeLinks.js';
 import { startScanner } from './scanner.js';
+import { hashForIsbn, isbnFromHash } from './hash.js';
+import { createListStore } from './storage.js';
+import { createRecent } from './recent.js';
+import { THEME_LABELS, applyTheme, loadTheme, nextTheme, saveTheme } from './theme.js';
 
 const form = document.getElementById('search');
 const input = document.getElementById('isbn');
@@ -12,6 +16,18 @@ const button = form.querySelector('button[type="submit"]');
 const scanButton = document.getElementById('scan');
 const scanner = document.getElementById('scanner');
 const preview = document.getElementById('preview');
+const recentEl = document.getElementById('recent');
+const themeButton = document.getElementById('theme');
+
+function browserStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null; // blocked storage: lists just won't persist
+  }
+}
+
+const recent = createRecent(createListStore(browserStorage(), 'isbn-reader.recent'));
 
 function el(tag, text, className) {
   const node = document.createElement(tag);
@@ -23,6 +39,22 @@ function el(tag, text, className) {
 function setStatus(text, isError = false) {
   status.textContent = text;
   status.className = isError ? 'error' : '';
+}
+
+function renderRecent() {
+  const entries = recent.list();
+  recentEl.hidden = entries.length === 0;
+  recentEl.replaceChildren(...entries.map(({ isbn, title }) => {
+    const chip = el('button', title, 'chip');
+    chip.type = 'button';
+    chip.title = isbn;
+    chip.addEventListener('click', () => {
+      input.value = isbn;
+      form.requestSubmit();
+    });
+    return chip;
+  }));
+  updateControls();
 }
 
 function formatRating(book) {
@@ -101,6 +133,7 @@ function updateControls() {
   button.disabled = searching || scanning;
   scanButton.disabled = searching;
   scanButton.textContent = scanning ? 'Stop' : 'Scan';
+  for (const chip of recentEl.querySelectorAll('button')) chip.disabled = searching || scanning;
 }
 
 // The "not a book ISBN" hint is shown once and cleared when no such barcode has been
@@ -169,34 +202,89 @@ scanButton.addEventListener('click', () => {
 });
 window.addEventListener('pagehide', closeScanner);
 
-form.addEventListener('submit', async (event) => {
+form.addEventListener('submit', (event) => {
   event.preventDefault();
   if (searching) return;
+  search(normalizeIsbn(input.value));
+});
+
+// Each search gets an id; a search that has been superseded (Back/Forward while it was
+// loading) must not draw its result, change the status or unlock the controls.
+let searchId = 0;
+
+// `push: false` is used when the search comes from the URL itself (load, Back/Forward);
+// those don't add a history entry. `focus` moves the cursor to the field when it finishes.
+async function search(isbn, { push = true, focus = push } = {}) {
   closeScanner();
-  const isbn = normalizeIsbn(input.value);
   result.replaceChildren();
   if (!isValidIsbn(isbn)) return setStatus('Please enter a valid ISBN-10 or ISBN-13.', true);
+  if (push && isbnFromHash(location.hash) !== isbn) history.pushState(null, '', hashForIsbn(isbn));
 
+  const id = ++searchId;
   searching = true;
   updateControls();
   setStatus('Searching…');
   let book;
   try {
     book = await fetchBookByIsbn(isbn);
+    if (id !== searchId) return;
     if (!book) {
       setStatus('Book not found.', true);
       return result.replaceChildren(storeLinksBlock(isbn));
     }
   } catch {
+    if (id !== searchId) return;
     return setStatus('Could not reach Open Library. Please try again.', true);
   } finally {
-    searching = false;
-    updateControls();
-    input.focus();
+    if (id === searchId) {
+      searching = false;
+      updateControls();
+      if (focus) input.focus();
+    }
   }
   setStatus('');
+  recent.add({ isbn, title: book.title });
+  renderRecent();
   // Not awaited: the book is already shown, so the form is usable while this loads.
   // If another search replaced the card meanwhile, the container is detached and the
   // late result is simply never displayed.
   renderOthers(renderBook(book, isbn), book);
+}
+
+window.addEventListener('popstate', () => {
+  const isbn = isbnFromHash(location.hash);
+  if (isbn) {
+    input.value = isbn;
+    search(isbn, { push: false });
+  } else {
+    closeScanner();
+    searchId++; // cancel a search that is still loading
+    searching = false;
+    updateControls();
+    input.value = '';
+    result.replaceChildren();
+    setStatus('');
+  }
 });
+
+let theme = loadTheme(browserStorage());
+
+function showTheme() {
+  applyTheme(document.documentElement, theme);
+  themeButton.textContent = THEME_LABELS[theme];
+  themeButton.setAttribute('aria-label', `Theme: ${theme}. Click to change.`);
+}
+
+themeButton.addEventListener('click', () => {
+  theme = nextTheme(theme);
+  saveTheme(browserStorage(), theme);
+  showTheme();
+});
+showTheme();
+
+renderRecent();
+const linkedIsbn = isbnFromHash(location.hash);
+if (linkedIsbn) {
+  input.value = linkedIsbn;
+  search(linkedIsbn, { push: false, focus: true });
+}

@@ -3,17 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>ISBN Reader</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📚%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
+  <!-- Apply a saved light/dark override before first paint, so there is no flash of the wrong theme. -->
+  <script>
+    try {
+      var saved = localStorage.getItem('isbn-reader.theme');
+      if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
+    } catch (e) {}
+  </script>
 </head>
 <body>
   <main>
-    <h1>ISBN Reader</h1>
+    <div class="top">
+      <h1>ISBN Reader</h1>
+      <button type="button" id="theme" title="Theme: follows the device, or force light or dark">🌓 Auto</button>
+    </div>
     <form id="search">
       <input id="isbn" type="text" placeholder="ISBN, e.g. 978-0-14-032872-1" autocomplete="off" autofocus>
       <button type="submit">Search</button>
       <button type="button" id="scan">Scan</button>
     </form>
+    <div id="recent" class="recent" hidden></div>
     <div id="scanner" hidden>
       <video id="preview" playsinline muted></video>
       <p class="meta">Point the camera at the barcode on the back cover. Can't scan? Stop the camera and type the ISBN.</p>
