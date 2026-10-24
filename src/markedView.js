@@ -1,6 +1,12 @@
 import { el, externalLink } from './dom.js';
 import { isbnLinks } from './links.js';
 
+// An icon-only button still needs a name for screen readers, and a tooltip for the mouse.
+const iconLabel = (button, label) => {
+  button.title = label;
+  button.setAttribute('aria-label', label);
+};
+
 const plural = (n) => `${n} book${n === 1 ? '' : 's'}`;
 
 // The "Marked" UI: the list, its Copy / Download / Clear actions, and the "Mark" toggle on a
@@ -12,7 +18,12 @@ export function createMarkedView({ marked, elements, onOpen, notify }) {
   let locked = false;
 
   function syncToggle(button) {
-    button.textContent = marked.has(button.dataset.isbn) ? 'Unmark' : 'Mark';
+    const isMarked = marked.has(button.dataset.isbn);
+    button.textContent = isMarked ? '★' : '☆';
+    // a toggle keeps one name and exposes its state, instead of renaming itself
+    button.title = isMarked ? 'Marked (click to unmark)' : 'Mark';
+    button.setAttribute('aria-label', 'Mark');
+    button.setAttribute('aria-pressed', String(isMarked));
   }
 
   function render() {
@@ -27,14 +38,17 @@ export function createMarkedView({ marked, elements, onOpen, notify }) {
       open.disabled = locked;
       open.title = `Show ${book.isbn}`;
       open.addEventListener('click', () => onOpen(book.isbn));
-      const remove = el('button', 'Unmark');
+      const remove = el('button', '✕', 'icon');
       remove.type = 'button';
+      iconLabel(remove, 'Unmark');
       remove.addEventListener('click', () => {
         marked.remove(book.isbn);
         render();
       });
       const links = isbnLinks(book.isbn).map(({ name, url }) => externalLink(name, url, `${book.isbn} on ${name}`));
-      item.append(open, ...links, remove);
+      const actions = el('span', null, 'row-actions');
+      actions.append(...links, remove);
+      item.append(open, actions);
       return item;
     }));
     for (const toggle of document.querySelectorAll('.mark-toggle')) syncToggle(toggle);
@@ -47,7 +61,7 @@ export function createMarkedView({ marked, elements, onOpen, notify }) {
   }
 
   function toggleFor(book, isbn) {
-    const button = el('button', null, 'mark-toggle');
+    const button = el('button', null, 'mark-toggle icon');
     button.type = 'button';
     button.dataset.isbn = isbn;
     button.addEventListener('click', () => {

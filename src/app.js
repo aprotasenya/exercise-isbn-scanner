@@ -119,8 +119,8 @@ function renderBook(book, isbn, { hideMark = false } = {}) {
   const body = el('div');
   const heading = el('h2', book.title);
   body.append(heading, nameField(book, isbn, heading));
-  if (!hideMark) body.append(markedView.toggleFor(book, isbn));
   card.append(body);
+  if (!hideMark) card.append(markedView.toggleFor(book, isbn)); // right edge, like the ✕ in the list
   result.replaceChildren(card, linksBlock(isbn));
 }
 
