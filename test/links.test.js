@@ -6,8 +6,8 @@ import isbns from './fixtures/isbns.json' with { type: 'json' };
 
 test('returns Ereadian and Goodreads links, in that order', () => {
   assert.deepEqual(isbnLinks('9786171299412'), [
-    { name: 'Ereadian', url: 'https://ereadian.com/search?q=9786171299412', icon: 'icons/ereadian.png', title: '9786171299412 on Ereadian' },
-    { name: 'Goodreads', url: 'https://www.goodreads.com/book/isbn/9786171299412', icon: 'icons/goodreads.png', title: '9786171299412 on Goodreads' },
+    { name: 'Ereadian', url: 'https://ereadian.com/search?q=9786171299412', icon: 'icons/ereadian.png', title: '9786171299412 на Ereadian' },
+    { name: 'Goodreads', url: 'https://www.goodreads.com/book/isbn/9786171299412', icon: 'icons/goodreads.png', title: '9786171299412 на Goodreads' },
   ]);
 });
 

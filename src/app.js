@@ -7,7 +7,8 @@ import { createBookList, isBookEntry } from './bookList.js';
 import { createNames } from './names.js';
 import { createListView, createMarkToggle, iconButton } from './listView.js';
 import { el, linkButton } from './dom.js';
-import { THEME_LABELS, applyTheme, loadTheme, nextTheme, saveTheme } from './theme.js';
+import { applyTheme, loadTheme, nextTheme, saveTheme } from './theme.js';
+import { THEME_LABELS, t } from './strings.js';
 
 const form = document.getElementById('search');
 const input = document.getElementById('isbn');
@@ -47,9 +48,9 @@ const names = createNames(createListStore(browserStorage(), 'isbn-reader.names')
 const warning = document.getElementById('list-warning');
 let warnedList = null;
 
-function warnFull(name, list, advice) {
+function warnFull(name, list) {
   warnedList = list;
-  warning.textContent = `The ${name} list is full (${list.limit} books), so this book was not added. ${advice}`;
+  warning.textContent = t.listFull(name, list.limit, t.fullAdvice[name]);
   warning.hidden = false;
 }
 
@@ -82,12 +83,12 @@ function renderLists() {
 const markToggle = createMarkToggle({
   marked,
   onChange: renderLists,
-  onFull: () => warnFull('Marked', marked, 'Unmark some books or clear the list to add more.'),
+  onFull: () => warnFull('marked', marked),
 });
 const scannedView = createListView({
   list: scanned,
   filename: 'isbn-scanned.json',
-  confirmClear: (n) => `Remove all ${n} from the Scanned list? Marked books stay marked.`,
+  confirmClear: t.clearScanned,
   rowButton: (book) => markToggle.create(book, book.isbn),
   onOpen: openBook,
   onChange: renderLists,
@@ -97,9 +98,9 @@ const scannedView = createListView({
 const markedView = createListView({
   list: marked,
   filename: 'isbn-marked.json',
-  confirmClear: (n) => `Unmark all ${n}?`,
+  confirmClear: t.clearMarked,
   rowButton: (book) => {
-    const remove = iconButton('✕', 'Unmark');
+    const remove = iconButton('✕', t.unmark);
     remove.addEventListener('click', () => {
       marked.remove(book.isbn);
       renderLists();
@@ -122,7 +123,7 @@ function setStatus(text, isError = false) {
 // clearing a typed name falls back to `ISBN <isbn>`.
 const storedTitle = (isbn) =>
   [scanned, marked].map((l) => l.list().find((b) => b.isbn === isbn)?.title).find(Boolean);
-const bookFor = (isbn) => ({ title: names.get(isbn) || storedTitle(isbn) || `ISBN ${isbn}` });
+const bookFor = (isbn) => ({ title: names.get(isbn) || storedTitle(isbn) || t.isbnTitle(isbn) });
 
 // The name field on a card. The name is saved per ISBN and also updates the card and the
 // Scanned and Marked entries for that book.
@@ -130,12 +131,12 @@ function nameField(book, isbn, heading) {
   const field = el('input', null, 'name-input');
   field.type = 'text';
   field.maxLength = 120;
-  field.placeholder = 'Name this book (optional)';
-  field.setAttribute('aria-label', 'Name this book');
+  field.placeholder = t.namePlaceholder;
+  field.setAttribute('aria-label', t.nameLabel);
   field.value = names.get(isbn) ?? '';
   field.addEventListener('change', () => {
     field.value = names.set(isbn, field.value);
-    book.title = field.value || `ISBN ${isbn}`;
+    book.title = field.value || t.isbnTitle(isbn);
     heading.textContent = book.title;
     marked.rename(isbn, book.title);
     scanned.rename(isbn, book.title);
@@ -169,7 +170,7 @@ function updateControls() {
   const scanning = !scanner.hidden;
   input.disabled = scanning;
   button.disabled = scanning;
-  scanButton.textContent = scanning ? 'Stop' : 'Scan';
+  scanButton.textContent = scanning ? t.stop : t.scan;
   keepScanning.disabled = scanning;
   scannedView.setLocked(scanning);
   markedView.setLocked(scanning);
@@ -197,7 +198,7 @@ function clearHint() {
   setStatus('');
 }
 
-const showNotBookHint = () => showHint('not-a-book', "That barcode isn't a book ISBN.");
+const showNotBookHint = () => showHint('not-a-book', t.notABook);
 
 function closeScanner() {
   scanToken++;
@@ -282,14 +283,14 @@ const scannedTitle = (isbn) => scanned.list().find((book) => book.isbn === isbn)
 
 function showAlreadyScanned(isbn) {
   const title = scannedTitle(isbn);
-  if (title) showHint(isbn, `Already scanned: ${title}`);
+  if (title) showHint(isbn, t.alreadyScanned(title));
 }
 
 // Every search or scan puts the book at the top of the Scanned list. Returns false when the
 // list is full and the book is new: it is not added, and the warning says so.
 function noteScanned(isbn, title) {
   const stored = scanned.bump({ isbn, title });
-  if (!stored) warnFull('Scanned', scanned, 'Clear the list to add more.');
+  if (!stored) warnFull('scanned', scanned);
   renderLists();
   return stored;
 }
@@ -323,8 +324,8 @@ function addScanned(isbn) {
   }
   const book = bookFor(isbn);
   touchRun(isbn, true);
-  if (noteScanned(isbn, book.title)) setStatus(`Scanned: ${book.title}`);
-  else setStatus(`Not added: ${book.title} (the Scanned list is full)`, true);
+  if (noteScanned(isbn, book.title)) setStatus(t.added(book.title));
+  else setStatus(t.notAdded(book.title), true);
 }
 
 async function openScanner() {
@@ -349,7 +350,7 @@ async function openScanner() {
         closeScanner();
         input.value = isbn;
         search(isbn);
-        if (again) setStatus(`Already scanned: ${scannedTitle(isbn)}`);
+        if (again) setStatus(t.alreadyScanned(bookFor(isbn).title));
       },
       onUnrecognized: showNotBookHint,
       onRepeat: sightedAgain,
@@ -361,7 +362,7 @@ async function openScanner() {
     console.error('Could not start the scanner:', err);
     if (token !== scanToken) return;
     closeScanner();
-    setStatus('Camera unavailable. Type the ISBN instead.', true);
+    setStatus(t.cameraUnavailable, true);
     input.focus();
   }
 }
@@ -384,7 +385,7 @@ form.addEventListener('submit', (event) => {
 function search(isbn, { push = true, focus = push, move = true } = {}) {
   closeScanner();
   result.replaceChildren();
-  if (!isValidIsbn(isbn)) return setStatus('Please enter a valid ISBN-10 or ISBN-13.', true);
+  if (!isValidIsbn(isbn)) return setStatus(t.invalidIsbn, true);
   if (push && isbnFromHash(location.hash) !== isbn) history.pushState(null, '', hashForIsbn(isbn));
 
   const book = bookFor(isbn);
@@ -413,7 +414,7 @@ let theme = loadTheme(browserStorage());
 function showTheme() {
   applyTheme(document.documentElement, theme);
   themeButton.textContent = THEME_LABELS[theme];
-  themeButton.setAttribute('aria-label', `Theme: ${theme}. Click to change.`);
+  themeButton.setAttribute('aria-label', t.themeAria(theme));
 }
 
 themeButton.addEventListener('click', () => {

@@ -1,7 +1,6 @@
 import { el, linkButton } from './dom.js';
+import { books, t } from './strings.js';
 import { isbnLinks } from './links.js';
-
-const plural = (n) => `${n} book${n === 1 ? '' : 's'}`;
 
 // An icon-only button still needs a name for screen readers, and a tooltip for the mouse.
 export function iconButton(icon, label) {
@@ -18,13 +17,13 @@ export function createMarkToggle({ marked, onChange, onFull }) {
   function sync(button) {
     const isMarked = marked.has(button.dataset.isbn);
     button.textContent = isMarked ? '★' : '☆';
-    button.title = isMarked ? 'Marked (click to unmark)' : 'Mark';
+    button.title = isMarked ? t.isMarked : t.mark;
     button.setAttribute('aria-pressed', String(isMarked));
   }
   return {
     // `book.title` is read on click, so a rename after the button was made is picked up.
     create(book, isbn) {
-      const button = iconButton('', 'Mark');
+      const button = iconButton('', t.mark);
       button.classList.add('mark-toggle');
       button.dataset.isbn = isbn;
       button.addEventListener('click', () => {
@@ -43,7 +42,7 @@ export function createMarkToggle({ marked, onChange, onFull }) {
 
 // One book list in the page (Scanned or Marked): the rows, and its Copy / Download / Clear actions.
 // All text goes in via textContent.
-//   list: a book list (src/bookList.js); filename: for the JSON download; confirmClear(count): the confirm question;
+//   list: a book list (src/bookList.js); filename: for the JSON download; confirmClear(booksText): the confirm question, given the count as text ("3 книги");
 //   rowButton(book): the button at the end of each row; onOpen(isbn): search for a book from the list;
 //   onChange(): called after Clear, so every list and star in the page is redrawn;
 //   notify(text, isError): status line; elements: { section, count, items, empty, copy, download, clear }
@@ -67,7 +66,7 @@ export function createListView({ list, filename, confirmClear, rowButton, onOpen
       const open = el('button', book.title, 'open');
       open.type = 'button';
       open.disabled = locked;
-      open.title = `Show ${book.isbn}`;
+      open.title = t.show(book.isbn);
       open.addEventListener('click', () => onOpen(book.isbn));
       const actions = el('span', null, 'row-actions');
       actions.append(
@@ -89,9 +88,9 @@ export function createListView({ list, filename, confirmClear, rowButton, onOpen
   copy.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(list.toText());
-      notify(`Copied ${plural(list.list().length)} to the clipboard.`);
+      notify(t.copied(books(list.list().length)));
     } catch {
-      notify('Could not copy. Use Download JSON instead.', true);
+      notify(t.copyFailed, true);
     }
   });
 
@@ -107,7 +106,7 @@ export function createListView({ list, filename, confirmClear, rowButton, onOpen
   });
 
   clear.addEventListener('click', () => {
-    if (confirm(confirmClear(plural(list.list().length)))) {
+    if (confirm(confirmClear(books(list.list().length)))) {
       list.clear();
       onChange();
     }

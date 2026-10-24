@@ -1,7 +1,6 @@
 // Theme choice: "auto" follows the device setting (prefers-color-scheme, handled in CSS),
 // "light" and "dark" override it. The override is remembered; "auto" is stored as nothing.
 export const THEMES = ['auto', 'light', 'dark'];
-export const THEME_LABELS = { auto: '🌓 Auto', light: '☀️ Light', dark: '🌙 Dark' };
 
 const KEY = 'isbn-reader.theme';
 

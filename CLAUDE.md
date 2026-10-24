@@ -12,6 +12,7 @@ Minimal web page: enter or scan (camera) an ISBN, get a card with links to look 
 Ideas that are not in the current work go to `BACKLOG.md`.
 
 ## Constraints
+- The interface is Ukrainian only (no language toggle): fixed text is written in `index.html`, every message built in code is in `src/strings.js` (Ukrainian plurals via `plural()`). The lists are «Шукане» (code: `scanned`) and «Вибране» (code: `marked`). Keep new texts concise.
 - The app talks to no book API: Open Library was dropped on purpose (and Google Books before it), so a book is only its ISBN or the name the user typed. Don't reintroduce a book-data API, a key or `config.js` without being asked.
 - Ereadian and Goodreads are link-only (`src/links.js`), shown as their icons (saved in `icons/`, see its README; never fetched at runtime, since their servers send no CORS headers): their pages can't be read from the browser and Ukrainian stores (Yakaboo, Rozetka) block scripts (403), so don't scrape them. The user can type a name for a book on its card.
 - Render user-supplied text (typed names, stored lists) only via `textContent`, never `innerHTML`.

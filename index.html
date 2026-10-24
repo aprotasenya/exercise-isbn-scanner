@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="uk">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>ISBN Reader</title>
+  <title>Сканер ISBN</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📚%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
   <!-- Apply a saved light/dark override before first paint, so there is no flash of the wrong theme. -->
@@ -18,42 +18,42 @@
 <body>
   <main>
     <div class="top">
-      <h1>ISBN Reader</h1>
-      <button type="button" id="theme" title="Theme: follows the device, or force light or dark">🌓 Auto</button>
+      <h1>Сканер ISBN</h1>
+      <button type="button" id="theme" title="Тема: як на пристрої, або світла чи темна">🌓 Авто</button>
     </div>
     <form id="search">
-      <input id="isbn" type="text" placeholder="ISBN, e.g. 978-0-14-032872-1" autocomplete="off">
-      <button type="submit">Search</button>
-      <button type="button" id="scan">Scan</button>
-      <label class="keep" title="Keep the camera on and add each book to Scanned as it is read">
-        <input type="checkbox" id="keep-scanning"> Keep scanning
+      <input id="isbn" type="text" placeholder="ISBN, напр. 978-0-14-032872-1" autocomplete="off">
+      <button type="submit">Пошук</button>
+      <button type="button" id="scan">Сканувати</button>
+      <label class="keep" title="Камера лишається ввімкненою, кожна книга додається до «Шуканого»">
+        <input type="checkbox" id="keep-scanning"> Безперервно
       </label>
     </form>
     <div id="scanner" hidden>
       <video id="preview" playsinline muted></video>
-      <p class="meta">Point the camera at the barcode on the back cover. Can't scan? Stop the camera and type the ISBN.</p>
+      <p class="meta">Наведіть камеру на штрихкод на звороті книги. Не виходить? Зупиніть камеру й введіть ISBN.</p>
     </div>
     <p id="status" role="status"></p>
     <section id="result"></section>
     <p id="list-warning" class="warning" role="alert" hidden></p>
     <details id="scanned" class="book-list">
-      <summary>Scanned (<span id="scanned-count">0</span>)</summary>
-      <p id="scanned-empty" class="meta">Nothing scanned yet. Every ISBN you search or scan shows up here; press the ☆ to mark the ones you want.</p>
+      <summary>Шукане (<span id="scanned-count">0</span>)</summary>
+      <p id="scanned-empty" class="meta">Поки порожньо. Кожен ISBN, який ви шукаєте чи скануєте, з’являється тут; натисніть ☆, щоб вибрати книгу.</p>
       <ul id="scanned-list"></ul>
       <div class="list-actions">
-        <button type="button" id="copy-scanned">Copy list</button>
-        <button type="button" id="download-scanned">Download JSON</button>
-        <button type="button" id="clear-scanned">Clear</button>
+        <button type="button" id="copy-scanned">Копіювати</button>
+        <button type="button" id="download-scanned">Завантажити JSON</button>
+        <button type="button" id="clear-scanned">Очистити</button>
       </div>
     </details>
     <details id="marked" class="book-list">
-      <summary>Marked (<span id="marked-count">0</span>)</summary>
-      <p id="marked-empty" class="meta">Nothing marked yet. Press the ☆ on a book, here or on its card.</p>
+      <summary>Вибране (<span id="marked-count">0</span>)</summary>
+      <p id="marked-empty" class="meta">Нічого не вибрано. Натисніть ☆ на книзі, тут або на її картці.</p>
       <ul id="marked-list"></ul>
       <div class="list-actions">
-        <button type="button" id="copy-marked">Copy list</button>
-        <button type="button" id="download-marked">Download JSON</button>
-        <button type="button" id="clear-marked">Clear</button>
+        <button type="button" id="copy-marked">Копіювати</button>
+        <button type="button" id="download-marked">Завантажити JSON</button>
+        <button type="button" id="clear-marked">Очистити</button>
       </div>
     </details>
   </main>
