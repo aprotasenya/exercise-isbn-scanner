@@ -69,7 +69,6 @@ const listElements = (id) => ({
   items: document.getElementById(`${id}-list`),
   empty: document.getElementById(`${id}-empty`),
   copy: document.getElementById(`copy-${id}`),
-  download: document.getElementById(`download-${id}`),
   clear: document.getElementById(`clear-${id}`),
 });
 
@@ -87,7 +86,6 @@ const markToggle = createMarkToggle({
 });
 const scannedView = createListView({
   list: scanned,
-  filename: 'isbn-scanned.json',
   confirmClear: t.clearScanned,
   rowButton: (book) => markToggle.create(book, book.isbn),
   onOpen: openBook,
@@ -97,7 +95,6 @@ const scannedView = createListView({
 });
 const markedView = createListView({
   list: marked,
-  filename: 'isbn-marked.json',
   confirmClear: t.clearMarked,
   rowButton: (book) => {
     const remove = iconButton('✕', t.unmark);

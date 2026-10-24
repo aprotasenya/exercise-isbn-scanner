@@ -40,16 +40,16 @@ export function createMarkToggle({ marked, onChange, onFull }) {
   };
 }
 
-// One book list in the page (Scanned or Marked): the rows, and its Copy / Download / Clear actions.
+// One book list in the page (Scanned or Marked): the rows, and its Copy / Clear actions.
 // All text goes in via textContent.
-//   list: a book list (src/bookList.js); filename: for the JSON download; confirmClear(booksText): the confirm question, given the count as text ("3 книги");
+//   list: a book list (src/bookList.js); confirmClear(booksText): the confirm question, given the count as text ("3 книги");
 //   rowButton(book): the button at the end of each row; onOpen(isbn): search for a book from the list;
 //   onChange(): called after Clear, so every list and star in the page is redrawn;
-//   notify(text, isError): status line; elements: { section, count, items, empty, copy, download, clear }
+//   notify(text, isError): status line; elements: { section, count, items, empty, copy, clear }
 // The section (a <details>) opens by itself when the list stops being empty (on load, or at the
 // first book added, also while scanning); after that the user's open/closed choice is left alone.
-export function createListView({ list, filename, confirmClear, rowButton, onOpen, onChange, notify, elements }) {
-  const { section, count, items, empty, copy, download, clear } = elements;
+export function createListView({ list, confirmClear, rowButton, onOpen, onChange, notify, elements }) {
+  const { section, count, items, empty, copy, clear } = elements;
   let locked = false;
   let wasEmpty = true;
 
@@ -59,7 +59,7 @@ export function createListView({ list, filename, confirmClear, rowButton, onOpen
     if (books.length > 0 && wasEmpty) section.open = true;
     wasEmpty = books.length === 0;
     empty.hidden = books.length > 0;
-    for (const button of [copy, download]) button.disabled = books.length === 0;
+    copy.disabled = books.length === 0;
     clear.disabled = books.length === 0 || locked;
     items.replaceChildren(...books.map((book) => {
       const item = el('li');
@@ -92,17 +92,6 @@ export function createListView({ list, filename, confirmClear, rowButton, onOpen
     } catch {
       notify(t.copyFailed, true);
     }
-  });
-
-  download.addEventListener('click', () => {
-    const url = URL.createObjectURL(new Blob([list.toJson()], { type: 'application/json' }));
-    const link = el('a');
-    link.href = url;
-    link.download = filename;
-    document.body.append(link); // some browsers ignore a click on a link that is not in the page
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
   });
 
   clear.addEventListener('click', () => {

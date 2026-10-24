@@ -50,12 +50,6 @@ test('entries saved by earlier versions (with authors) are still listed', () => 
   assert.equal(marked.toText(), 'Old (1)');
 });
 
-test('toJson round-trips the list', () => {
-  const marked = createBookList(memoryStore());
-  marked.add(matilda, new Date('2026-10-23T10:00:00Z'));
-  assert.deepEqual(JSON.parse(marked.toJson()), marked.list());
-});
-
 test('ignores malformed stored entries', () => {
   const marked = createBookList(memoryStore([null, { isbn: 1 }, { isbn: '1', title: 'Ok', authors: [] }]));
   assert.deepEqual(marked.list().map((b) => b.isbn), ['1']);

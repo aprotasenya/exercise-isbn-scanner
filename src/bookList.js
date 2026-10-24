@@ -47,8 +47,5 @@ export function createBookList(store, limit = LIST_LIMIT) {
         .map((e) => `${e.title} (${e.isbn})`)
         .join('\n');
     },
-    toJson() {
-      return JSON.stringify(read(), null, 2);
-    },
   };
 }

@@ -46,5 +46,5 @@ export const t = {
   clearScanned: (booksText) => `Очистити «${listNames.scanned}» (${booksText})? Вибране залишиться.`,
   clearMarked: (booksText) => `Очистити «${listNames.marked}» (${booksText})?`,
   copied: (booksText) => `Скопійовано ${booksText} до буфера.`,
-  copyFailed: 'Не вдалося скопіювати. Скористайтеся «Завантажити JSON».',
+  copyFailed: 'Не вдалося скопіювати.',
 };
