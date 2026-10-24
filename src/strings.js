@@ -32,7 +32,6 @@ export const t = {
   mark: 'Вибрати',
   isMarked: 'Вибрано (натисніть, щоб прибрати)',
   unmark: 'Прибрати з вибраного',
-  show: (isbn) => `Показати ${isbn}`,
   linkTitle: (isbn, site) => `${isbn} на ${site}`,
   added: (title) => `Додано: ${title}`,
   alreadyScanned: (title) => `Вже в «Шуканому»: ${title}`,

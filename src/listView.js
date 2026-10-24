@@ -66,7 +66,7 @@ export function createListView({ list, confirmClear, rowButton, onOpen, onChange
       const open = el('button', book.title, 'open');
       open.type = 'button';
       open.disabled = locked;
-      open.title = t.show(book.isbn);
+      open.title = book.title; // the full name, for a name the row has to cut
       open.addEventListener('click', () => onOpen(book.isbn));
       const actions = el('span', null, 'row-actions');
       actions.append(
