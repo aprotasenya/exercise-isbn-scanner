@@ -1,4 +1,4 @@
-// Names the user typed for books Open Library does not know, keyed by ISBN (newest first).
+// Names the user typed for books, keyed by ISBN (newest first).
 const isEntry = (e) => e && typeof e.isbn === 'string' && typeof e.name === 'string';
 
 export function createNames(store, limit = 1000) {

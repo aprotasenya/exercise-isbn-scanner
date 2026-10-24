@@ -1,7 +1,5 @@
 import { isValidIsbn, normalizeIsbn } from './isbn.js';
-import { fetchBookByIsbn, fetchOtherBooksByAuthor, unknownBook } from './openLibrary.js';
-import { descriptionToText } from './text.js';
-import { storeSearchLinks } from './storeLinks.js';
+import { isbnLinks } from './links.js';
 import { startScanner } from './scanner.js';
 import { hashForIsbn, isbnFromHash } from './hash.js';
 import { createListStore, readFlag, writeFlag } from './storage.js';
@@ -9,7 +7,7 @@ import { createRecent } from './recent.js';
 import { createMarked } from './marked.js';
 import { createNames } from './names.js';
 import { createMarkedView } from './markedView.js';
-import { el } from './dom.js';
+import { el, externalLink } from './dom.js';
 import { THEME_LABELS, applyTheme, loadTheme, nextTheme, saveTheme } from './theme.js';
 
 const form = document.getElementById('search');
@@ -75,31 +73,24 @@ function renderRecent() {
   updateControls();
 }
 
-function formatRating(book) {
-  if (book.averageRating == null) return 'No rating available';
-  const count = book.ratingsCount != null ? ` (${book.ratingsCount} ratings)` : '';
-  return `★ ${book.averageRating}${count}`;
-}
-
-function storeLinksBlock(isbn) {
-  const block = el('p', 'Search this ISBN on ', 'store-links meta');
-  storeSearchLinks(isbn).forEach(({ name, url }, i) => {
-    if (i > 0) block.append(', ');
-    const link = el('a', name);
-    link.href = url;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    block.append(link);
+function linksBlock(isbn) {
+  const block = el('p', 'Look up this ISBN on ', 'store-links meta');
+  isbnLinks(isbn).forEach(({ name, url }, i, all) => {
+    if (i > 0) block.append(i === all.length - 1 ? ' or ' : ', ');
+    block.append(externalLink(name, url));
   });
   block.append('.');
   return block;
 }
 
-// A book Open Library lacks shows the name the user typed for its ISBN, if any.
-const withName = (book, isbn) =>
-  (book.unknown ? { ...book, title: names.get(isbn) || book.title } : book);
+// No book data is fetched: a book is its ISBN, or the name the user typed for it. Titles stored
+// by earlier versions (from Open Library) are kept; renaming updates the stored titles too, so
+// clearing a typed name falls back to `ISBN <isbn>`.
+const storedTitle = (isbn) =>
+  marked.list().find((b) => b.isbn === isbn)?.title ?? recent.list().find((b) => b.isbn === isbn)?.title;
+const bookFor = (isbn) => ({ title: names.get(isbn) || storedTitle(isbn) || `ISBN ${isbn}` });
 
-// The field on an unknown book's card. The name is saved per ISBN and also updates the card
+// The name field on a card. The name is saved per ISBN and also updates the card, the chip
 // and the Marked entry for that book.
 function nameField(book, isbn, heading) {
   const field = el('input', null, 'name-input');
@@ -120,51 +111,17 @@ function nameField(book, isbn, heading) {
   return field;
 }
 
-const markEntry = (book, isbn) =>
-  ({ isbn, title: book.title, authors: book.authors, publishedDate: book.publishedDate });
+const markEntry = (book, isbn) => ({ isbn, title: book.title });
 
 // `hideMark`: the book was just marked automatically, so the Mark button is not offered.
 function renderBook(book, isbn, { hideMark = false } = {}) {
   const card = el('article', null, 'book');
-  if (book.thumbnail) {
-    const img = el('img');
-    img.src = book.thumbnail;
-    img.alt = `Cover of ${book.title}`;
-    card.append(img);
-  }
   const body = el('div');
   const heading = el('h2', book.title);
-  body.append(heading);
-  if (book.authors.length) body.append(el('p', `by ${book.authors.join(', ')}`, 'meta'));
-  const details = [book.publisher, book.publishedDate, book.pageCount && `${book.pageCount} pages`]
-    .filter(Boolean).join(' · ');
-  if (details) body.append(el('p', details, 'meta'));
-  body.append(el('p', book.unknown ? 'Not found in Open Library.' : formatRating(book), 'meta'));
-  if (book.unknown) body.append(nameField(book, isbn, heading));
+  body.append(heading, nameField(book, isbn, heading));
   if (!hideMark) body.append(markedView.toggleFor(book, isbn));
-  if (book.description) body.append(el('p', descriptionToText(book.description), 'description'));
-  const others = el('div', null, 'others');
-  body.append(others);
   card.append(body);
-  result.replaceChildren(card, storeLinksBlock(isbn));
-  return others;
-}
-
-async function renderOthers(container, book) {
-  if (!book.authorKey) return;
-  container.append(el('h3', `More by ${book.authors[0]}`));
-  try {
-    const books = await fetchOtherBooksByAuthor(book.authorKey, book);
-    if (!books.length) return container.append(el('p', 'No other books found.', 'meta'));
-    const list = el('ul');
-    for (const b of books) {
-      const year = b.publishedDate?.slice(0, 4);
-      list.append(el('li', year ? `${b.title} (${year})` : b.title));
-    }
-    container.append(list);
-  } catch {
-    container.append(el('p', 'Could not load other books by this author.', 'meta'));
-  }
+  result.replaceChildren(card, linksBlock(isbn));
 }
 
 // Camera scanning. `scanToken` lets a Stop pressed while the permission prompt is still
@@ -172,22 +129,18 @@ async function renderOthers(container, book) {
 let stopCamera = null;
 let scanToken = 0;
 
-let searching = false;
-
-// The field and Search are locked while a search runs or the camera is on;
-// The Scan button turns into Stop while the camera is on, and is locked only during a
-// search (Stop is the way out of a scan).
+// The field, Search, chips and checkboxes are locked while the camera is on; the Scan button
+// turns into Stop (the way out of a scan).
 function updateControls() {
   const scanning = !scanner.hidden;
-  input.disabled = searching || scanning;
-  button.disabled = searching || scanning;
-  scanButton.disabled = searching;
+  input.disabled = scanning;
+  button.disabled = scanning;
   scanButton.textContent = scanning ? 'Stop' : 'Scan';
-  for (const chip of recentEl.querySelectorAll('button')) chip.disabled = searching || scanning;
-  autoMark.disabled = searching || scanning;
+  for (const chip of recentEl.querySelectorAll('button')) chip.disabled = scanning;
+  autoMark.disabled = scanning;
   // "Keep scanning" only makes sense when scanned books are marked automatically.
-  keepScanning.disabled = searching || scanning || !autoMark.checked;
-  markedView.setLocked(searching || scanning);
+  keepScanning.disabled = scanning || !autoMark.checked;
+  markedView.setLocked(scanning);
 }
 
 // Transient scanner messages ("not a book ISBN", "Already marked") are shown once and cleared
@@ -225,15 +178,14 @@ function closeScanner() {
   updateControls();
 }
 
-// "Keep scanning" (needs Auto-mark): the camera stays on and each new book is looked up and marked.
-const lookups = new Set();
+// "Keep scanning" (needs Auto-mark): the camera stays on and each new book is marked.
 let audio = null;
 
 const BEEP_MARKED = 880; // Hz
 const BEEP_ALREADY = 520; // lower: the book was already marked
 
 // Browsers only allow sound after a tap, and a scan result arrives long after it (the camera
-// start and the lookup are asynchronous). So the audio is created and unlocked in the Scan tap.
+// start is asynchronous). So the audio is created and unlocked in the Scan tap.
 // Returns a promise that settles once the audio is running (it never rejects).
 function prepareAudio() {
   try {
@@ -283,7 +235,6 @@ function confirmScan(frequency = BEEP_MARKED) {
 let run = null; // { isbn, fresh }
 let runTimer = null;
 const RUN_MS = 3000; // same as the scanner's duplicate window, so the two never disagree
-const failures = new Map(); // isbn -> when its lookup last failed
 
 function touchRun(isbn, fresh) {
   if (run?.isbn !== isbn) run = { isbn, fresh };
@@ -298,7 +249,7 @@ function showAlreadyMarked(isbn) {
   if (title) showHint(isbn, `Already marked: ${title}`);
 }
 
-// A scanned book is a lookup like a typed one: it goes to the front of the "last 10" chips.
+// A scanned book is a search like a typed one: it goes to the front of the "last 10" chips.
 function noteRecent(isbn, title) {
   recent.add({ isbn, title });
   renderRecent();
@@ -307,12 +258,7 @@ function noteRecent(isbn, title) {
 // Another sighting of a book that is still in view (or was seen moments ago).
 function sightedAgain(isbn) {
   if (run?.isbn === isbn && run.fresh) return touchRun(isbn, true);
-  if (!marked.has(isbn)) {
-    // Its lookup is still running (nothing to do) or failed: retry every 3 s while it stays in view.
-    const failedAt = failures.get(isbn);
-    if (!lookups.has(isbn) && failedAt !== undefined && Date.now() - failedAt >= RUN_MS) addScanned(isbn);
-    return;
-  }
+  if (!marked.has(isbn)) return;
   const startOfRun = hintKey !== isbn; // the "Already marked" message is not showing yet
   touchRun(isbn, false);
   showAlreadyMarked(isbn);
@@ -322,39 +268,19 @@ function sightedAgain(isbn) {
   }
 }
 
-async function addScanned(isbn) {
-  if (lookups.has(isbn)) return;
-  const session = scanToken; // changes when the camera is stopped or restarted
-  failures.delete(isbn);
+function addScanned(isbn) {
   clearHint();
   if (marked.has(isbn)) {
     touchRun(isbn, false);
     showAlreadyMarked(isbn);
-    noteRecent(isbn, markedTitle(isbn));
-    return;
+    return noteRecent(isbn, markedTitle(isbn));
   }
-
+  const book = bookFor(isbn);
   touchRun(isbn, true);
-  lookups.add(isbn);
-  setStatus(`Looking up ${isbn}…`);
-  try {
-    // A book Open Library lacks is kept as a placeholder so the scan is not lost.
-    const book = withName((await fetchBookByIsbn(isbn)) ?? unknownBook(isbn), isbn);
-    marked.add(markEntry(book, isbn));
-    markedView.render();
-    noteRecent(isbn, book.title);
-    // The scan is recorded either way, but if the camera was stopped meanwhile, stay quiet:
-    // the status line and the beep now belong to whatever the user is doing.
-    if (session !== scanToken) return;
-    const unnamed = book.unknown && !names.get(isbn);
-    setStatus(unnamed ? `Marked ISBN ${isbn} (not found in Open Library)` : `Marked: ${book.title}`);
-  } catch {
-    failures.set(isbn, Date.now());
-    if (run?.isbn === isbn) run = null; // not marked, so sightings must not count as "fresh"
-    if (session === scanToken) setStatus(`Could not look up ${isbn}. Keep it in view to retry.`, true);
-  } finally {
-    lookups.delete(isbn);
-  }
+  marked.add(markEntry(book, isbn));
+  markedView.render();
+  noteRecent(isbn, book.title);
+  setStatus(`Marked: ${book.title}`);
 }
 
 async function openScanner() {
@@ -372,7 +298,7 @@ async function openScanner() {
   try {
     const stop = await startScanner(preview, {
       onIsbn(isbn) {
-        // beep as soon as the camera reads the barcode, before any lookup: high = new, low = already marked
+        // high = a book not marked yet, low = already marked
         confirmScan(marked.has(isbn) ? BEEP_ALREADY : BEEP_MARKED);
         if (continuous) return addScanned(isbn);
         closeScanner();
@@ -403,57 +329,31 @@ window.addEventListener('pagehide', closeScanner);
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
-  if (searching) return;
   search(normalizeIsbn(input.value));
 });
 
-// Each search gets an id; a search that has been superseded (Back/Forward while it was
-// loading) must not draw its result, change the status or unlock the controls.
-let searchId = 0;
-
 // `push: false` is used when the search comes from the URL itself (load, Back/Forward);
-// those don't add a history entry. `focus` moves the cursor to the field when it finishes.
+// those don't add a history entry. `focus` moves the cursor to the field when it is done.
 // `fromScan`: a single camera scan, so with Auto-mark the book is marked automatically.
-async function search(isbn, { push = true, focus = push, fromScan = false } = {}) {
+function search(isbn, { push = true, focus = push, fromScan = false } = {}) {
   closeScanner();
   result.replaceChildren();
   if (!isValidIsbn(isbn)) return setStatus('Please enter a valid ISBN-10 or ISBN-13.', true);
   if (push && isbnFromHash(location.hash) !== isbn) history.pushState(null, '', hashForIsbn(isbn));
 
-  const id = ++searchId;
-  searching = true;
-  updateControls();
-  setStatus('Searching…');
-  let book;
-  try {
-    book = await fetchBookByIsbn(isbn);
-    if (id !== searchId) return;
-  } catch {
-    if (id !== searchId) return;
-    return setStatus('Could not reach Open Library. Please try again.', true);
-  } finally {
-    if (id === searchId) {
-      searching = false;
-      updateControls();
-      if (focus) input.focus();
-    }
-  }
-  // A book Open Library lacks still gets a card (so it can be marked) and the store link.
-  book = withName(book ?? unknownBook(isbn), isbn);
+  const book = bookFor(isbn);
   const autoMarked = fromScan && autoMark.checked;
-  let note = book.unknown ? 'Not found in Open Library.' : '';
+  let note = '';
   if (autoMarked) {
     const added = marked.add(markEntry(book, isbn));
     markedView.render();
     note = `${added ? 'Marked' : 'Already marked'}: ${book.title}`;
   }
   setStatus(note);
-  recent.add({ isbn, title: book.title }); // not-found books too: they can be named later
+  recent.add({ isbn, title: book.title });
   renderRecent();
-  // Not awaited: the book is already shown, so the form is usable while this loads.
-  // If another search replaced the card meanwhile, the container is detached and the
-  // late result is simply never displayed.
-  renderOthers(renderBook(book, isbn, { hideMark: autoMarked }), book);
+  renderBook(book, isbn, { hideMark: autoMarked });
+  if (focus) input.focus();
 }
 
 window.addEventListener('popstate', () => {
@@ -463,9 +363,6 @@ window.addEventListener('popstate', () => {
     search(isbn, { push: false });
   } else {
     closeScanner();
-    searchId++; // cancel a search that is still loading
-    searching = false;
-    updateControls();
     input.value = '';
     result.replaceChildren();
     setStatus('');

@@ -5,3 +5,13 @@ export function el(tag, text, className) {
   if (className) node.className = className;
   return node;
 }
+
+// An external link that opens in a new tab.
+export function externalLink(text, url, tooltip) {
+  const link = el('a', text);
+  link.href = url;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  if (tooltip) link.title = tooltip;
+  return link;
+}

@@ -1,6 +1,6 @@
 {
   "checkedOn": "2026-10-23",
-  "about": "ISBNs for tests that need several books. `found` resolve in Open Library (titles as it returned them; they can change). `notFoundInOpenLibrary` are valid ISBNs of Ukrainian books that Ereadian has and Open Library lacks (the app shows 'Book not found.' and the Ereadian link). `invalid` fail the ISBN check. Use them in order, e.g. the first 11 `found` plus invalid[0] as the 6th search for the recent-chips test. If one stops resolving as described, report it instead of swapping it silently.",
+  "about": "Valid ISBNs for tests and browser checks that need several books, plus invalid ones. The app no longer asks Open Library anything; the split between `found` and `notFoundInOpenLibrary` is only history (whether Open Library knew the book on 2026-10-23), and the titles are what it returned then. `invalid` fail the ISBN check. Use them in order, e.g. the first 11 `found` plus invalid[0] as the 6th search for the recent-chips test.",
   "found": [
     {
       "isbn": "9780747532699",

@@ -1,5 +1,5 @@
-import { el } from './dom.js';
-import { storeSearchLinks } from './storeLinks.js';
+import { el, externalLink } from './dom.js';
+import { isbnLinks } from './links.js';
 
 const plural = (n) => `${n} book${n === 1 ? '' : 's'}`;
 
@@ -27,22 +27,14 @@ export function createMarkedView({ marked, elements, onOpen, notify }) {
       open.disabled = locked;
       open.title = `Show ${book.isbn}`;
       open.addEventListener('click', () => onOpen(book.isbn));
-      const meta = el('span', [book.authors?.join(', '), book.isbn].filter(Boolean).join(' · '), 'meta');
       const remove = el('button', 'Unmark');
       remove.type = 'button';
       remove.addEventListener('click', () => {
         marked.remove(book.isbn);
         render();
       });
-      const links = storeSearchLinks(book.isbn).map(({ name, url }) => {
-        const link = el('a', name);
-        link.href = url;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.title = `Search ${book.isbn} on ${name}`;
-        return link;
-      });
-      item.append(open, meta, ...links, remove);
+      const links = isbnLinks(book.isbn).map(({ name, url }) => externalLink(name, url, `${book.isbn} on ${name}`));
+      item.append(open, ...links, remove);
       return item;
     }));
     for (const toggle of document.querySelectorAll('.mark-toggle')) syncToggle(toggle);
@@ -60,7 +52,7 @@ export function createMarkedView({ marked, elements, onOpen, notify }) {
     button.dataset.isbn = isbn;
     button.addEventListener('click', () => {
       if (marked.has(isbn)) marked.remove(isbn);
-      else marked.add({ isbn, title: book.title, authors: book.authors, publishedDate: book.publishedDate });
+      else marked.add({ isbn, title: book.title });
       render();
     });
     syncToggle(button);

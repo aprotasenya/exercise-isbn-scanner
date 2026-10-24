@@ -52,12 +52,9 @@ button { padding: .5rem 1rem; font-size: 1rem; }
 #status { min-height: 1.5em; color: var(--muted); }
 #status.error { color: var(--error); }
 .book { display: flex; gap: 1rem; background: var(--card); padding: 1rem; border-radius: 8px; }
-.book img { width: 128px; height: fit-content; }
 .book h2 { margin: 0 0 .25rem; }
 .meta { color: var(--muted); margin: .25rem 0; }
-.description { white-space: pre-line; }
 .store-links { margin-top: 1rem; }
-.others { margin-top: 1rem; }
 .mark-toggle { margin-top: .5rem; }
 .marked { margin-top: 1.5rem; background: var(--card); padding: .75rem 1rem; border-radius: 8px; }
 .marked summary { cursor: pointer; font-weight: 600; }

@@ -7,8 +7,8 @@ function memoryStore(initial = []) {
   return { read: () => list, write: (next) => { list = next; } };
 }
 
-const matilda = { isbn: '9780141365466', title: 'Matilda', authors: ['Roald Dahl'], publishedDate: '1988' };
-const potter = { isbn: '9780747532699', title: "Harry Potter and the Philosopher's Stone", authors: ['J. K. Rowling'] };
+const matilda = { isbn: '9780141365466', title: 'Matilda' };
+const potter = { isbn: '9780747532699', title: 'ISBN 9780747532699' };
 
 test('adds books newest first and records when', () => {
   const marked = createMarked(memoryStore());
@@ -38,14 +38,16 @@ test('has, remove and clear', () => {
   assert.deepEqual(marked.list(), []);
 });
 
-test('toText lists "Author — Title (ISBN)" per line, with a fallback for no author', () => {
+test('toText lists "Title (ISBN)" per line, newest first', () => {
   const marked = createMarked(memoryStore());
-  marked.add({ isbn: '9780747532699', title: 'No Author Book' });
+  marked.add(potter);
   marked.add(matilda);
-  assert.equal(
-    marked.toText(),
-    'Roald Dahl — Matilda (9780141365466)\nUnknown author — No Author Book (9780747532699)',
-  );
+  assert.equal(marked.toText(), 'Matilda (9780141365466)\nISBN 9780747532699 (9780747532699)');
+});
+
+test('entries saved by earlier versions (with authors) are still listed', () => {
+  const marked = createMarked(memoryStore([{ isbn: '1', title: 'Old', authors: ['A'], publishedDate: '1999' }]));
+  assert.equal(marked.toText(), 'Old (1)');
 });
 
 test('toJson round-trips the list', () => {

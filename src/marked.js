@@ -9,10 +9,10 @@ export function createMarked(store) {
     list: read,
     has: (isbn) => read().some((e) => e.isbn === isbn),
     // Returns false (and changes nothing) when the ISBN is already marked.
-    add({ isbn, title, authors = [], publishedDate = null }, now = new Date()) {
+    add({ isbn, title }, now = new Date()) {
       const books = read();
       if (books.some((e) => e.isbn === isbn)) return false;
-      store.write([{ isbn, title, authors, publishedDate, addedAt: now.toISOString() }, ...books]);
+      store.write([{ isbn, title, addedAt: now.toISOString() }, ...books]);
       return true;
     },
     remove(isbn) {
@@ -27,7 +27,7 @@ export function createMarked(store) {
     },
     toText() {
       return read()
-        .map((e) => `${e.authors?.length ? e.authors.join(', ') : 'Unknown author'} — ${e.title} (${e.isbn})`)
+        .map((e) => `${e.title} (${e.isbn})`)
         .join('\n');
     },
     toJson() {
