@@ -245,9 +245,19 @@ function prepareAudio() {
   }
 }
 
+// The matching visual: a short flash over the page (amber for a new book, blue for a marked one).
+const snapEl = document.getElementById('snap');
+function flashSnap(again) {
+  snapEl.classList.remove('flash');
+  void snapEl.offsetWidth; // restart the animation when scans follow each other quickly
+  snapEl.classList.toggle('again', again);
+  snapEl.classList.add('flash');
+}
+
 // A short beep tells the user, without looking at the screen, that the camera read a barcode:
 // a higher tone for a book that is not marked yet, a lower one for one that already is.
 function confirmScan(frequency = BEEP_MARKED) {
+  flashSnap(frequency === BEEP_ALREADY);
   // a context that is still resuming has a frozen clock, so wait for it before scheduling
   prepareAudio().then(() => {
     if (audio?.state !== 'running') return;
