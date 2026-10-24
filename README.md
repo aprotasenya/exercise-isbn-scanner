@@ -1,5 +1,9 @@
 # ISBN Reader
 
+[![Test](https://github.com/aprotasenya/exercise-isbn-scanner/actions/workflows/test.yml/badge.svg)](https://github.com/aprotasenya/exercise-isbn-scanner/actions/workflows/test.yml)
+
+Live: https://aprotasenya.github.io/exercise-isbn-scanner/ (https, so the camera works on a phone)
+
 Minimal local page: enter an ISBN, see book info, rating, and other books by the author (via the Open Library API, no key needed).
 
 Press **Mark** on a book card to add it to the **Marked** list (a shopping companion), or tick **Auto-mark** so every scanned book is marked automatically (then **Keep scanning** keeps the camera on for several books). Copy the list or download it as JSON. The list, recent searches and settings are kept in your browser (`localStorage`).
