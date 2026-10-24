@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createListStore, readFlag, writeFlag } from '../src/storage.js';
+import { createListStore, copyListOnce } from '../src/storage.js';
+import { isBookEntry } from '../src/bookList.js';
 
 function fakeStorage(initial = {}) {
   const data = { ...initial };
@@ -36,26 +37,24 @@ test('a throwing or missing storage never throws', () => {
   }
 });
 
-test('a flag is stored as "1" when on and removed when off', () => {
+test('copyListOnce copies an old list to a new key, only when the new key is missing', () => {
   const storage = fakeStorage();
-  assert.equal(readFlag(storage, 'f'), false);
-  writeFlag(storage, 'f', true);
-  assert.equal(readFlag(storage, 'f'), true);
-  assert.deepEqual(storage.data, { f: '1' });
-  writeFlag(storage, 'f', false);
-  assert.equal(readFlag(storage, 'f'), false);
-  assert.deepEqual(storage.data, {});
+  storage.setItem('old', JSON.stringify([{ isbn: '1', title: 'A' }, null, { isbn: 2 }]));
+  copyListOnce(storage, 'old', 'new', isBookEntry);
+  assert.deepEqual(JSON.parse(storage.getItem('new')), [{ isbn: '1', title: 'A' }]);
+  assert.ok(storage.getItem('old'), 'the old key is left alone');
+  storage.setItem('old', JSON.stringify([{ isbn: '9', title: 'Z' }]));
+  copyListOnce(storage, 'old', 'new', isBookEntry);
+  assert.deepEqual(JSON.parse(storage.getItem('new')), [{ isbn: '1', title: 'A' }], 'an existing new list is not overwritten');
 });
 
-test('flags tolerate blocked storage', () => {
-  const broken = {
-    getItem() { throw new Error('blocked'); },
-    setItem() { throw new Error('blocked'); },
-    removeItem() { throw new Error('blocked'); },
-  };
-  for (const storage of [broken, null]) {
-    assert.equal(readFlag(storage, 'f'), false);
-    assert.doesNotThrow(() => writeFlag(storage, 'f', true));
-    assert.doesNotThrow(() => writeFlag(storage, 'f', false));
-  }
+test('copyListOnce ignores a missing, corrupt or blocked source', () => {
+  const storage = fakeStorage();
+  copyListOnce(storage, 'old', 'new', isBookEntry);
+  assert.equal(storage.getItem('new'), null);
+  storage.setItem('old', '{not json');
+  copyListOnce(storage, 'old', 'new', isBookEntry);
+  assert.equal(storage.getItem('new'), null);
+  const broken = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+  for (const s of [broken, null]) assert.doesNotThrow(() => copyListOnce(s, 'old', 'new', isBookEntry));
 });

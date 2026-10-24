@@ -38,15 +38,13 @@ form { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 #isbn { flex: 1 1 12rem; padding: .5rem; font-size: 1rem; }
 .keep { display: flex; align-items: center; gap: .3rem; font-size: .9rem; white-space: nowrap; }
 button { padding: .5rem 1rem; font-size: 1rem; }
-.recent { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .75rem; }
-.recent[hidden] { display: none; }
-.chip { padding: .2rem .7rem; font-size: .85rem; border-radius: 999px; }
 #scanner { margin-top: 1rem; }
 #preview { display: block; width: 100%; max-height: 50vh; background: #000; border-radius: 8px; }
 /* A brief shutter flash over the page when the camera reads a barcode (even if the scanner closes at once). */
 #snap { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: #ffb300; }
 #snap.flash { animation: snap .5s ease-out; }
 #snap.flash.again { background: #1e88e5; }
+#snap.flash.full { background: #e53935; }
 @keyframes snap { from { opacity: .55; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { #snap.flash { animation: none; } }
 #status { min-height: 1.5em; color: var(--muted); }
@@ -56,16 +54,17 @@ button { padding: .5rem 1rem; font-size: 1rem; }
 .book .mark-toggle { flex: none; }
 .book .name-input { margin-bottom: 0; } /* no trailing space under the name block */
 .book h2 { margin: 0 0 .25rem; }
+.warning { margin: 1rem 0 0; padding: .6rem .8rem; border-radius: 8px; border: 1px solid var(--error); color: var(--error); background: var(--card); }
 .meta { color: var(--muted); margin: .25rem 0; }
 .store-links { margin-top: 1rem; }
-.marked { margin-top: 1.5rem; background: var(--card); padding: .75rem 1rem; border-radius: 8px; }
-.marked summary { cursor: pointer; font-weight: 600; }
-.marked ul { list-style: none; margin: .5rem 0; padding: 0; }
+.book-list { margin-top: 1.5rem; background: var(--card); padding: .75rem 1rem; border-radius: 8px; }
+.book-list summary { cursor: pointer; font-weight: 600; }
+.book-list ul { list-style: none; margin: .5rem 0; padding: 0; }
 /* The name takes the left side and wraps; the links and the button stay together at the right edge. */
-.marked li { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .75rem; padding: .35rem 0; }
+.book-list li { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .75rem; padding: .35rem 0; }
 .row-actions { display: flex; align-items: center; gap: .75rem; margin-left: auto; } /* stays together, and right-aligned when it wraps under a long name */
-.marked .open { flex: 1 1 12rem; min-width: 0; padding: 0; border: 0; background: none; color: var(--link); font: inherit; text-align: left; text-decoration: underline; overflow-wrap: anywhere; cursor: pointer; }
+.book-list .open { flex: 1 1 12rem; min-width: 0; padding: 0; border: 0; background: none; color: var(--link); font: inherit; text-align: left; text-decoration: underline; overflow-wrap: anywhere; cursor: pointer; }
 .icon { min-width: 2.75rem; min-height: 2.75rem; font-size: 1.2rem; line-height: 1; padding: 0 .55rem; cursor: pointer; } /* a touch-sized target */
-.marked .open:disabled { color: var(--muted); cursor: default; }
-.marked-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.book-list .open:disabled { color: var(--muted); cursor: default; }
+.list-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .name-input { display: block; box-sizing: border-box; width: 100%; max-width: 24rem; margin: .4rem 0; padding: .35rem .5rem; font-size: .95rem; }

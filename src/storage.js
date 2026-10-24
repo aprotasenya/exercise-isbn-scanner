@@ -20,21 +20,15 @@ export function createListStore(storage, key) {
   };
 }
 
-// A remembered on/off setting (stored as "1"; "off" stores nothing).
-export function readFlag(storage, key) {
+// One-time migration: copies a list saved under an old key to a new key, unless the new key
+// already exists. Only entries accepted by `isValid` are copied; the old key stays.
+export function copyListOnce(storage, fromKey, toKey, isValid) {
   try {
-    return storage.getItem(key) === '1';
+    if (storage.getItem(toKey) !== null) return;
+    const list = JSON.parse(storage.getItem(fromKey));
+    if (!Array.isArray(list)) return;
+    storage.setItem(toKey, JSON.stringify(list.filter(isValid)));
   } catch {
-    return false;
+    // missing, corrupt or blocked storage: nothing to migrate
   }
 }
-
-export function writeFlag(storage, key, value) {
-  try {
-    if (value) storage.setItem(key, '1');
-    else storage.removeItem(key);
-  } catch {
-    // storage blocked: the setting just won't persist
-  }
-}
-

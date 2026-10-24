@@ -2,11 +2,10 @@ import { isValidIsbn, normalizeIsbn } from './isbn.js';
 import { isbnLinks } from './links.js';
 import { startScanner } from './scanner.js';
 import { hashForIsbn, isbnFromHash } from './hash.js';
-import { createListStore, readFlag, writeFlag } from './storage.js';
-import { createRecent } from './recent.js';
-import { createMarked } from './marked.js';
+import { createListStore, copyListOnce } from './storage.js';
+import { createBookList, isBookEntry } from './bookList.js';
 import { createNames } from './names.js';
-import { createMarkedView } from './markedView.js';
+import { createListView, createMarkToggle, iconButton } from './listView.js';
 import { el, externalLink } from './dom.js';
 import { THEME_LABELS, applyTheme, loadTheme, nextTheme, saveTheme } from './theme.js';
 
@@ -18,9 +17,7 @@ const button = form.querySelector('button[type="submit"]');
 const scanButton = document.getElementById('scan');
 const scanner = document.getElementById('scanner');
 const preview = document.getElementById('preview');
-const recentEl = document.getElementById('recent');
 const themeButton = document.getElementById('theme');
-const autoMark = document.getElementById('auto-mark');
 const keepScanning = document.getElementById('keep-scanning');
 
 function browserStorage() {
@@ -31,46 +28,92 @@ function browserStorage() {
   }
 }
 
-const recent = createRecent(createListStore(browserStorage(), 'isbn-reader.recent'));
-const marked = createMarked(createListStore(browserStorage(), 'isbn-reader.marked'));
-const AUTO_MARK_KEY = 'isbn-reader.automark';
+// "Scanned" is everything searched or scanned (it used to be the "last 10" chips, key
+// isbn-reader.recent); "Marked" is the subset the user picked.
+copyListOnce(browserStorage(), 'isbn-reader.recent', 'isbn-reader.scanned', isBookEntry);
+try {
+  browserStorage()?.removeItem('isbn-reader.automark'); // the Auto-mark setting no longer exists
+} catch {
+  // blocked storage: nothing to clean up
+}
+const scanned = createBookList(createListStore(browserStorage(), 'isbn-reader.scanned'));
+const marked = createBookList(createListStore(browserStorage(), 'isbn-reader.marked'));
 const names = createNames(createListStore(browserStorage(), 'isbn-reader.names'));
-const markedView = createMarkedView({
+
+// Opening a book from a list shows its card but does not move it in Scanned: only a new
+// search or scan does that.
+// A full list refuses new books. The book is still shown on its card; this warning sits
+// between the card and the lists until the next search or scan, or until there is room again.
+const warning = document.getElementById('list-warning');
+let warnedList = null;
+
+function warnFull(name, list, advice) {
+  warnedList = list;
+  warning.textContent = `The ${name} list is full (${list.limit} books), so this book was not added. ${advice}`;
+  warning.hidden = false;
+}
+
+function clearWarning() {
+  warnedList = null;
+  warning.hidden = true;
+}
+
+const openBook = (isbn) => {
+  input.value = isbn;
+  search(isbn, { move: false });
+};
+const listElements = (id) => ({
+  count: document.getElementById(`${id}-count`),
+  items: document.getElementById(`${id}-list`),
+  empty: document.getElementById(`${id}-empty`),
+  copy: document.getElementById(`copy-${id}`),
+  download: document.getElementById(`download-${id}`),
+  clear: document.getElementById(`clear-${id}`),
+});
+
+// Marking changes both lists (the stars in Scanned) and every star on the page.
+function renderLists() {
+  if (warnedList && !warnedList.isFull()) clearWarning(); // room again (Clear, Unmark)
+  scannedView.render();
+  markedView.render();
+  markToggle.syncAll();
+}
+const markToggle = createMarkToggle({
   marked,
-  elements: {
-    count: document.getElementById('marked-count'),
-    list: document.getElementById('marked-list'),
-    empty: document.getElementById('marked-empty'),
-    copy: document.getElementById('copy-marked'),
-    download: document.getElementById('download-marked'),
-    clear: document.getElementById('clear-marked'),
-  },
-  onOpen(isbn) {
-    input.value = isbn;
-    form.requestSubmit();
-  },
+  onChange: renderLists,
+  onFull: () => warnFull('Marked', marked, 'Unmark some books or clear the list to add more.'),
+});
+const scannedView = createListView({
+  list: scanned,
+  filename: 'isbn-scanned.json',
+  confirmClear: (n) => `Remove all ${n} from the Scanned list? Marked books stay marked.`,
+  rowButton: (book) => markToggle.create(book, book.isbn),
+  onOpen: openBook,
+  onChange: renderLists,
   notify: (text, isError) => setStatus(text, isError),
+  elements: listElements('scanned'),
+});
+const markedView = createListView({
+  list: marked,
+  filename: 'isbn-marked.json',
+  confirmClear: (n) => `Unmark all ${n}?`,
+  rowButton: (book) => {
+    const remove = iconButton('✕', 'Unmark');
+    remove.addEventListener('click', () => {
+      marked.remove(book.isbn);
+      renderLists();
+    });
+    return remove;
+  },
+  onOpen: openBook,
+  onChange: renderLists,
+  notify: (text, isError) => setStatus(text, isError),
+  elements: listElements('marked'),
 });
 
 function setStatus(text, isError = false) {
   status.textContent = text;
   status.className = isError ? 'error' : '';
-}
-
-function renderRecent() {
-  const entries = recent.list();
-  recentEl.hidden = entries.length === 0;
-  recentEl.replaceChildren(...entries.map(({ isbn, title }) => {
-    const chip = el('button', title, 'chip');
-    chip.type = 'button';
-    chip.title = isbn;
-    chip.addEventListener('click', () => {
-      input.value = isbn;
-      form.requestSubmit();
-    });
-    return chip;
-  }));
-  updateControls();
 }
 
 function linksBlock(isbn) {
@@ -87,11 +130,11 @@ function linksBlock(isbn) {
 // by earlier versions (from Open Library) are kept; renaming updates the stored titles too, so
 // clearing a typed name falls back to `ISBN <isbn>`.
 const storedTitle = (isbn) =>
-  marked.list().find((b) => b.isbn === isbn)?.title ?? recent.list().find((b) => b.isbn === isbn)?.title;
+  [scanned, marked].map((l) => l.list().find((b) => b.isbn === isbn)?.title).find(Boolean);
 const bookFor = (isbn) => ({ title: names.get(isbn) || storedTitle(isbn) || `ISBN ${isbn}` });
 
-// The name field on a card. The name is saved per ISBN and also updates the card, the chip
-// and the Marked entry for that book.
+// The name field on a card. The name is saved per ISBN and also updates the card and the
+// Scanned and Marked entries for that book.
 function nameField(book, isbn, heading) {
   const field = el('input', null, 'name-input');
   field.type = 'text';
@@ -104,23 +147,19 @@ function nameField(book, isbn, heading) {
     book.title = field.value || `ISBN ${isbn}`;
     heading.textContent = book.title;
     marked.rename(isbn, book.title);
-    markedView.render();
-    recent.rename(isbn, book.title);
-    renderRecent();
+    scanned.rename(isbn, book.title);
+    renderLists();
   });
   return field;
 }
 
-const markEntry = (book, isbn) => ({ isbn, title: book.title });
-
-// `hideMark`: the book was just marked automatically, so the Mark button is not offered.
-function renderBook(book, isbn, { hideMark = false } = {}) {
+function renderBook(book, isbn) {
   const card = el('article', null, 'book');
   const body = el('div');
   const heading = el('h2', book.title);
   body.append(heading, nameField(book, isbn, heading));
-  card.append(body);
-  if (!hideMark) card.append(markedView.toggleFor(book, isbn)); // right edge, like the ✕ in the list
+  // the star sits at the right edge of the card, like the buttons at the end of the list rows
+  card.append(body, markToggle.create(book, isbn));
   result.replaceChildren(card, linksBlock(isbn));
 }
 
@@ -129,21 +168,19 @@ function renderBook(book, isbn, { hideMark = false } = {}) {
 let stopCamera = null;
 let scanToken = 0;
 
-// The field, Search, chips and checkboxes are locked while the camera is on; the Scan button
+// The field, Search and the checkbox are locked while the camera is on; the Scan button
 // turns into Stop (the way out of a scan).
 function updateControls() {
   const scanning = !scanner.hidden;
   input.disabled = scanning;
   button.disabled = scanning;
   scanButton.textContent = scanning ? 'Stop' : 'Scan';
-  for (const chip of recentEl.querySelectorAll('button')) chip.disabled = scanning;
-  autoMark.disabled = scanning;
-  // "Keep scanning" only makes sense when scanned books are marked automatically.
-  keepScanning.disabled = scanning || !autoMark.checked;
+  keepScanning.disabled = scanning;
+  scannedView.setLocked(scanning);
   markedView.setLocked(scanning);
 }
 
-// Transient scanner messages ("not a book ISBN", "Already marked") are shown once and cleared
+// Transient scanner messages ("not a book ISBN", "Already scanned") are shown once and cleared
 // when the barcode has been out of view for a moment (decoding fires many times per second
 // while one is in frame). `hintKey` says which barcode the message belongs to.
 let hintKey = null;
@@ -178,11 +215,12 @@ function closeScanner() {
   updateControls();
 }
 
-// "Keep scanning" (needs Auto-mark): the camera stays on and each new book is marked.
+// "Keep scanning": the camera stays on and each new book is added to Scanned.
 let audio = null;
 
-const BEEP_MARKED = 880; // Hz
-const BEEP_ALREADY = 520; // lower: the book was already marked
+const BEEP_NEW = 880; // Hz
+const BEEP_AGAIN = 520; // lower: the book was already scanned
+const BEEP_FULL = 330; // lowest: the list is full, the book was not added
 
 // Browsers only allow sound after a tap, and a scan result arrives long after it (the camera
 // start is asynchronous). So the audio is created and unlocked in the Scan tap.
@@ -197,19 +235,22 @@ function prepareAudio() {
   }
 }
 
-// The matching visual: a short flash over the page (amber for a new book, blue for a marked one).
+// The matching visual: a short flash over the page (amber for a new book, blue for a repeat,
+// red when the list is full and the book was not added).
 const snapEl = document.getElementById('snap');
-function flashSnap(again) {
+function flashSnap(kind) {
   snapEl.classList.remove('flash');
   void snapEl.offsetWidth; // restart the animation when scans follow each other quickly
-  snapEl.classList.toggle('again', again);
+  snapEl.classList.toggle('again', kind === 'again');
+  snapEl.classList.toggle('full', kind === 'full');
   snapEl.classList.add('flash');
 }
 
 // A short beep tells the user, without looking at the screen, that the camera read a barcode:
-// a higher tone for a book that is not marked yet, a lower one for one that already is.
-function confirmScan(frequency = BEEP_MARKED) {
-  flashSnap(frequency === BEEP_ALREADY);
+// a higher tone for a new book, a lower one for one that was already scanned, the lowest
+// (with a red flash) when the Scanned list is full and the book was not added.
+function confirmScan(frequency = BEEP_NEW) {
+  flashSnap({ [BEEP_AGAIN]: 'again', [BEEP_FULL]: 'full' }[frequency] ?? 'new');
   // a context that is still resuming has a frozen clock, so wait for it before scheduling
   prepareAudio().then(() => {
     if (audio?.state !== 'running') return;
@@ -230,8 +271,8 @@ function confirmScan(frequency = BEEP_MARKED) {
 }
 
 // What is in front of the camera right now. A run lasts until its barcode has been out of view
-// for a moment. A book marked at the start of a run is "fresh": while it is still in view it
-// must not flip to "Already marked".
+// for a moment. A book added at the start of a run is "fresh": while it is still in view it
+// must not flip to "Already scanned".
 let run = null; // { isbn, fresh }
 let runTimer = null;
 const RUN_MS = 3000; // same as the scanner's duplicate window, so the two never disagree
@@ -242,52 +283,60 @@ function touchRun(isbn, fresh) {
   runTimer = setTimeout(() => { run = null; }, RUN_MS);
 }
 
-const markedTitle = (isbn) => marked.list().find((book) => book.isbn === isbn)?.title;
+const scannedTitle = (isbn) => scanned.list().find((book) => book.isbn === isbn)?.title;
 
-function showAlreadyMarked(isbn) {
-  const title = markedTitle(isbn);
-  if (title) showHint(isbn, `Already marked: ${title}`);
+function showAlreadyScanned(isbn) {
+  const title = scannedTitle(isbn);
+  if (title) showHint(isbn, `Already scanned: ${title}`);
 }
 
-// A scanned book is a search like a typed one: it goes to the front of the "last 10" chips.
-function noteRecent(isbn, title) {
-  recent.add({ isbn, title });
-  renderRecent();
+// Every search or scan puts the book at the top of the Scanned list. Returns false when the
+// list is full and the book is new: it is not added, and the warning says so.
+function noteScanned(isbn, title) {
+  const stored = scanned.bump({ isbn, title });
+  if (!stored) warnFull('Scanned', scanned, 'Clear the list to add more.');
+  renderLists();
+  return stored;
+}
+
+// Showing a book without searching for it again (opened from a list, Back/Forward, a reload
+// with a link): it is added to Scanned if missing, but an existing row stays where it is.
+function noteShown(isbn, title) {
+  if (!scanned.has(isbn)) noteScanned(isbn, title);
 }
 
 // Another sighting of a book that is still in view (or was seen moments ago).
 function sightedAgain(isbn) {
   if (run?.isbn === isbn && run.fresh) return touchRun(isbn, true);
-  if (!marked.has(isbn)) return;
-  const startOfRun = hintKey !== isbn; // the "Already marked" message is not showing yet
+  if (!scanned.has(isbn)) return;
+  const startOfRun = hintKey !== isbn; // the "Already scanned" message is not showing yet
   touchRun(isbn, false);
-  showAlreadyMarked(isbn);
+  showAlreadyScanned(isbn);
   if (startOfRun) {
-    noteRecent(isbn, markedTitle(isbn));
-    confirmScan(BEEP_ALREADY);
+    noteScanned(isbn, bookFor(isbn).title);
+    confirmScan(BEEP_AGAIN);
   }
 }
 
 function addScanned(isbn) {
   clearHint();
-  if (marked.has(isbn)) {
+  clearWarning();
+  if (scanned.has(isbn)) {
     touchRun(isbn, false);
-    showAlreadyMarked(isbn);
-    return noteRecent(isbn, markedTitle(isbn));
+    showAlreadyScanned(isbn);
+    return noteScanned(isbn, bookFor(isbn).title);
   }
   const book = bookFor(isbn);
   touchRun(isbn, true);
-  marked.add(markEntry(book, isbn));
-  markedView.render();
-  noteRecent(isbn, book.title);
-  setStatus(`Marked: ${book.title}`);
+  if (noteScanned(isbn, book.title)) setStatus(`Scanned: ${book.title}`);
+  else setStatus(`Not added: ${book.title} (the Scanned list is full)`, true);
 }
 
 async function openScanner() {
   if (!scanner.hidden) return;
   prepareAudio(); // still inside the tap, which is what lets sound play later
   const continuous = keepScanning.checked;
-  if (continuous) document.getElementById('marked').open = true; // show the list filling up
+  if (continuous) document.getElementById('scanned').open = true; // show the list filling up
   const token = ++scanToken;
   scanner.hidden = false;
   updateControls();
@@ -298,12 +347,15 @@ async function openScanner() {
   try {
     const stop = await startScanner(preview, {
       onIsbn(isbn) {
-        // high = a book not marked yet, low = already marked
-        confirmScan(marked.has(isbn) ? BEEP_ALREADY : BEEP_MARKED);
+        // high = a new book, low = already scanned, lowest = list full (not added)
+        const again = scanned.has(isbn);
+        const full = !again && scanned.isFull();
+        confirmScan(full ? BEEP_FULL : again ? BEEP_AGAIN : BEEP_NEW);
         if (continuous) return addScanned(isbn);
         closeScanner();
         input.value = isbn;
-        search(isbn, { fromScan: true }); // fromScan lets search() auto-mark this book
+        search(isbn);
+        if (again) setStatus(`Already scanned: ${scannedTitle(isbn)}`);
       },
       onUnrecognized: showNotBookHint,
       onRepeat: sightedAgain,
@@ -334,25 +386,18 @@ form.addEventListener('submit', (event) => {
 
 // `push: false` is used when the search comes from the URL itself (load, Back/Forward);
 // those don't add a history entry. `focus` moves the cursor to the field when it is done.
-// `fromScan`: a single camera scan, so with Auto-mark the book is marked automatically.
-function search(isbn, { push = true, focus = push, fromScan = false } = {}) {
+// `move: false`: the book is only shown again, so it keeps its place in the Scanned list.
+function search(isbn, { push = true, focus = push, move = true } = {}) {
   closeScanner();
   result.replaceChildren();
   if (!isValidIsbn(isbn)) return setStatus('Please enter a valid ISBN-10 or ISBN-13.', true);
   if (push && isbnFromHash(location.hash) !== isbn) history.pushState(null, '', hashForIsbn(isbn));
 
   const book = bookFor(isbn);
-  const autoMarked = fromScan && autoMark.checked;
-  let note = '';
-  if (autoMarked) {
-    const added = marked.add(markEntry(book, isbn));
-    markedView.render();
-    note = `${added ? 'Marked' : 'Already marked'}: ${book.title}`;
-  }
-  setStatus(note);
-  recent.add({ isbn, title: book.title });
-  renderRecent();
-  renderBook(book, isbn, { hideMark: autoMarked });
+  setStatus('');
+  clearWarning();
+  (move ? noteScanned : noteShown)(isbn, book.title);
+  renderBook(book, isbn);
   if (focus) input.focus();
 }
 
@@ -360,7 +405,7 @@ window.addEventListener('popstate', () => {
   const isbn = isbnFromHash(location.hash);
   if (isbn) {
     input.value = isbn;
-    search(isbn, { push: false });
+    search(isbn, { push: false, move: false });
   } else {
     closeScanner();
     input.value = '';
@@ -384,17 +429,10 @@ themeButton.addEventListener('click', () => {
 });
 showTheme();
 
-autoMark.checked = readFlag(browserStorage(), AUTO_MARK_KEY);
-autoMark.addEventListener('change', () => {
-  writeFlag(browserStorage(), AUTO_MARK_KEY, autoMark.checked);
-  if (!autoMark.checked) keepScanning.checked = false;
-  updateControls();
-});
-
-markedView.render();
-renderRecent();
+renderLists();
+updateControls();
 const linkedIsbn = isbnFromHash(location.hash);
 if (linkedIsbn) {
   input.value = linkedIsbn;
-  search(linkedIsbn, { push: false, focus: true });
+  search(linkedIsbn, { push: false, focus: true, move: false });
 }
