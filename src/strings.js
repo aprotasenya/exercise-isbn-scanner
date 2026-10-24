@@ -28,7 +28,7 @@ export const t = {
   notABook: 'Це не ISBN книги.',
   cameraUnavailable: 'Камера недоступна. Введіть ISBN вручну.',
   nameLabel: 'Назва книги',
-  namePlaceholder: 'Назва книги (необов’язково)',
+  editName: 'Змінити назву',
   mark: 'Вибрати',
   isMarked: 'Вибрано (натисніть, щоб прибрати)',
   unmark: 'Прибрати з вибраного',

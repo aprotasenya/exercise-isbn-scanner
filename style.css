@@ -53,8 +53,15 @@ button { padding: .5rem 1rem; font-size: 1rem; }
 .book-head { display: flex; align-items: flex-start; gap: 1rem; }
 .book-head > div { flex: 1 1 auto; min-width: 0; } /* the name block; the star button sits at the right edge, top-aligned with it */
 .book-head .mark-toggle { flex: none; }
-.book .name-input { margin-bottom: 0; } /* no trailing space under the name block */
-.book h2 { margin: 0 0 .25rem; }
+.book-title { margin: 0; }
+/* The title looks like heading text with a dashed underline; tapping it swaps in a field with the same font.
+   Both share one box (the negative margin cancels the padding and border), so nothing moves when editing starts. */
+.title-edit, .title-input { display: block; box-sizing: border-box; margin: 0 calc(-.25rem - 1px); width: calc(100% + .5rem + 2px); padding: 0 .25rem; border: 1px solid transparent; border-radius: 4px; font: inherit; }
+.title-edit { background: none; color: inherit; text-align: left; overflow-wrap: anywhere; cursor: text;
+  /* a thin dashed line, always there, to show the title can be tapped; offset below the descenders */
+  text-decoration: underline dashed; text-decoration-thickness: 1px; text-decoration-color: var(--muted); text-underline-offset: .22em; }
+.title-edit:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.title-input { border-color: var(--link); background: var(--bg); color: var(--fg); }
 .warning { margin: 1rem 0 0; padding: .6rem .8rem; border-radius: 8px; border: 1px solid var(--error); color: var(--error); background: var(--card); }
 .meta { color: var(--muted); margin: .25rem 0; }
 /* The lookup buttons under the name: the site icon at twice its 32px size, the name beneath. */
@@ -76,4 +83,3 @@ button { padding: .5rem 1rem; font-size: 1rem; }
 .icon { min-width: 2.75rem; min-height: 2.75rem; font-size: 1.2rem; line-height: 1; padding: 0 .55rem; cursor: pointer; } /* a touch-sized target */
 .book-list .open:disabled { color: var(--muted); cursor: default; }
 .list-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.name-input { display: block; box-sizing: border-box; width: 100%; max-width: 24rem; margin: .4rem 0; padding: .35rem .5rem; font-size: .95rem; }

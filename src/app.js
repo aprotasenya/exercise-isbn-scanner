@@ -122,32 +122,71 @@ const storedTitle = (isbn) =>
   [scanned, marked].map((l) => l.list().find((b) => b.isbn === isbn)?.title).find(Boolean);
 const bookFor = (isbn) => ({ title: names.get(isbn) || storedTitle(isbn) || t.isbnTitle(isbn) });
 
-// The name field on a card. The name is saved per ISBN and also updates the card and the
-// Scanned and Marked entries for that book.
-function nameField(book, isbn, heading) {
-  const field = el('input', null, 'name-input');
-  field.type = 'text';
-  field.maxLength = 120;
-  field.placeholder = t.namePlaceholder;
-  field.setAttribute('aria-label', t.nameLabel);
-  field.value = names.get(isbn) ?? '';
-  field.addEventListener('change', () => {
-    field.value = names.set(isbn, field.value);
-    book.title = field.value || t.isbnTitle(isbn);
-    heading.textContent = book.title;
+// The title on a card is also where the book is named: tap it to type a name (Enter or leaving
+// the field saves, Escape cancels); an empty name goes back to `ISBN <number>`. The name is saved
+// per ISBN and also updates the Scanned and Marked entries for that book.
+function titleHeading(book, isbn) {
+  const heading = el('h2', null, 'book-title');
+
+  // `refocus`: the editor was closed from the keyboard, so keep the focus on the title
+  // (otherwise it would fall back to the top of the page).
+  function showTitle(refocus = false) {
+    const title = el('button', book.title, 'title-edit');
+    title.type = 'button';
+    title.title = t.editName;
+    title.addEventListener('click', startEditing);
+    heading.replaceChildren(title);
+    if (refocus) title.focus();
+  }
+
+  function save(raw) {
+    const value = raw.trim().replace(/\s+/g, ' ');
+    if (value === book.title) return; // unchanged: this also keeps titles saved by earlier versions
+    const name = value.slice(0, 120) === t.isbnTitle(isbn) ? '' : value;
+    const title = names.set(isbn, name) || t.isbnTitle(isbn);
+    if (title === book.title) return; // e.g. an empty name on a card that already shows the default
+    book.title = title;
     marked.rename(isbn, book.title);
     scanned.rename(isbn, book.title);
     renderLists();
-  });
-  return field;
+  }
+
+  function startEditing() {
+    const field = el('input', null, 'title-input');
+    field.type = 'text';
+    field.maxLength = 120;
+    field.value = book.title;
+    field.placeholder = t.isbnTitle(isbn); // what an empty name turns back into
+    field.setAttribute('aria-label', t.nameLabel);
+    let finished = false;
+    const finish = (keep, refocus) => {
+      if (finished) return; // Enter and the blur that follows it must not save twice
+      finished = true;
+      if (keep) save(field.value);
+      showTitle(refocus);
+    };
+    field.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault(); // else the Enter is also delivered to the title button that takes the field's place, and reopens the editor
+        finish(true, true);
+      }
+      if (event.key === 'Escape') finish(false, true);
+    });
+    field.addEventListener('blur', () => finish(true, false));
+    heading.replaceChildren(field);
+    field.focus();
+    field.select();
+  }
+
+  showTitle();
+  return heading;
 }
 
 function renderBook(book, isbn) {
   const card = el('article', null, 'book');
   const head = el('div', null, 'book-head');
   const body = el('div');
-  const heading = el('h2', book.title);
-  body.append(heading, nameField(book, isbn, heading));
+  body.append(titleHeading(book, isbn));
   // the star sits at the right edge of the card, like the buttons at the end of the list rows
   head.append(body, markToggle.create(book, isbn));
   const links = el('div', null, 'link-row');
