@@ -4,7 +4,7 @@
 
 Live: https://aprotasenya.github.io/exercise-isbn-scanner/ (https, so the camera works on a phone)
 
-Minimal page: enter or scan an ISBN and get a card with links to look the book up on Ereadian and Goodreads. No book data is fetched from anywhere, so a book is shown as `ISBN <number>` unless you type a name for it on its card.
+Minimal page: enter or scan an ISBN and get a card with two buttons (the site icons) that look the book up on Ereadian and Goodreads. No book data is fetched from anywhere, so a book is shown as `ISBN <number>` unless you type a name for it on its card.
 
 Every ISBN you search or scan goes into the **Scanned** list. Press the ☆ on a card or in that list to put a book into the **Marked** list (a shopping companion); each list holds up to 1000 books and can be copied or downloaded as JSON. A full list refuses new books and says so: clear it (or unmark some) to add more. Both lists, typed names and settings are kept in your browser (`localStorage`).
 

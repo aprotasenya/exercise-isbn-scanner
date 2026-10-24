@@ -6,7 +6,7 @@ import { createListStore, copyListOnce } from './storage.js';
 import { createBookList, isBookEntry } from './bookList.js';
 import { createNames } from './names.js';
 import { createListView, createMarkToggle, iconButton } from './listView.js';
-import { el, externalLink } from './dom.js';
+import { el, linkButton } from './dom.js';
 import { THEME_LABELS, applyTheme, loadTheme, nextTheme, saveTheme } from './theme.js';
 
 const form = document.getElementById('search');
@@ -117,16 +117,6 @@ function setStatus(text, isError = false) {
   status.className = isError ? 'error' : '';
 }
 
-function linksBlock(isbn) {
-  const block = el('p', 'Look up this ISBN on ', 'store-links meta');
-  isbnLinks(isbn).forEach(({ name, url }, i, all) => {
-    if (i > 0) block.append(i === all.length - 1 ? ' or ' : ', ');
-    block.append(externalLink(name, url));
-  });
-  block.append('.');
-  return block;
-}
-
 // No book data is fetched: a book is its ISBN, or the name the user typed for it. Titles stored
 // by earlier versions (from Open Library) are kept; renaming updates the stored titles too, so
 // clearing a typed name falls back to `ISBN <isbn>`.
@@ -156,12 +146,16 @@ function nameField(book, isbn, heading) {
 
 function renderBook(book, isbn) {
   const card = el('article', null, 'book');
+  const head = el('div', null, 'book-head');
   const body = el('div');
   const heading = el('h2', book.title);
   body.append(heading, nameField(book, isbn, heading));
   // the star sits at the right edge of the card, like the buttons at the end of the list rows
-  card.append(body, markToggle.create(book, isbn));
-  result.replaceChildren(card, linksBlock(isbn));
+  head.append(body, markToggle.create(book, isbn));
+  const links = el('div', null, 'link-row');
+  links.append(...isbnLinks(isbn).map((link) => linkButton(link, { big: true })));
+  card.append(head, links);
+  result.replaceChildren(card);
 }
 
 // Camera scanning. `scanToken` lets a Stop pressed while the permission prompt is still

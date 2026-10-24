@@ -8,7 +8,6 @@ Ideas that are not part of the current work. Move an item into the plan when it 
 
 ## Next up (after the current iteration)
 - **Rebuild the search zone clearly prioritizing the scan method.** Today the form is a text field with Search, Scan and Keep scanning side by side; the camera is the main way to use the app (on a phone in a shop), typing is the fallback. Rework the top of the page so Scan is the obvious primary action (large, first, with Keep scanning next to it) and the ISBN field and Search read as the secondary way.
-- **Use icons for Ereadian/Goodreads in links** instead of a string name
 - **Ukrainian interface** (no toggle, just Ukrainian).
 
 ## Later

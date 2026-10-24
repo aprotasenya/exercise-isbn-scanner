@@ -49,14 +49,23 @@ button { padding: .5rem 1rem; font-size: 1rem; }
 @media (prefers-reduced-motion: reduce) { #snap.flash { animation: none; } }
 #status { min-height: 1.5em; color: var(--muted); }
 #status.error { color: var(--error); }
-.book { display: flex; align-items: flex-start; gap: 1rem; background: var(--card); padding: 1rem; border-radius: 8px; }
-.book > div { flex: 1 1 auto; min-width: 0; } /* the name block; the star button sits at the right edge, top-aligned with it */
-.book .mark-toggle { flex: none; }
+.book { background: var(--card); padding: 1rem; border-radius: 8px; }
+.book-head { display: flex; align-items: flex-start; gap: 1rem; }
+.book-head > div { flex: 1 1 auto; min-width: 0; } /* the name block; the star button sits at the right edge, top-aligned with it */
+.book-head .mark-toggle { flex: none; }
 .book .name-input { margin-bottom: 0; } /* no trailing space under the name block */
 .book h2 { margin: 0 0 .25rem; }
 .warning { margin: 1rem 0 0; padding: .6rem .8rem; border-radius: 8px; border: 1px solid var(--error); color: var(--error); background: var(--card); }
 .meta { color: var(--muted); margin: .25rem 0; }
-.store-links { margin-top: 1rem; }
+/* The lookup buttons under the name: the site icon at twice its 32px size, the name beneath. */
+.link-row { display: flex; justify-content: center; gap: 1rem; margin-top: 1rem; }
+.link-button { box-sizing: border-box; width: 88px; height: 88px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px; border: 1px solid var(--muted); border-radius: 8px; color: var(--fg); text-decoration: none; font-size: .75rem; line-height: 1; }
+.link-button img { width: 64px; height: 64px; border-radius: 6px; }
+.link-button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* a long name is cut, not overflowing */
+.icon-link { box-sizing: border-box; width: 2.75rem; height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--muted); border-radius: 4px; }
+.icon-link { overflow: hidden; font-size: .6rem; line-height: 1; color: var(--fg); text-align: center; } /* the alt text, if the icon does not load */
+.icon-link img { width: 28px; height: 28px; border-radius: 4px; }
+.link-button:focus-visible, .icon-link:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .book-list { margin-top: 1.5rem; background: var(--card); padding: .75rem 1rem; border-radius: 8px; }
 .book-list summary { cursor: pointer; font-weight: 600; }
 .book-list ul { list-style: none; margin: .5rem 0; padding: 0; }

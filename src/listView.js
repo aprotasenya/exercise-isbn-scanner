@@ -1,4 +1,4 @@
-import { el, externalLink } from './dom.js';
+import { el, linkButton } from './dom.js';
 import { isbnLinks } from './links.js';
 
 const plural = (n) => `${n} book${n === 1 ? '' : 's'}`;
@@ -71,7 +71,7 @@ export function createListView({ list, filename, confirmClear, rowButton, onOpen
       open.addEventListener('click', () => onOpen(book.isbn));
       const actions = el('span', null, 'row-actions');
       actions.append(
-        ...isbnLinks(book.isbn).map(({ name, url }) => externalLink(name, url, `${book.isbn} on ${name}`)),
+        ...isbnLinks(book.isbn).map((link) => linkButton(link)),
         rowButton(book),
       );
       item.append(open, actions);
