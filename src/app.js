@@ -232,23 +232,39 @@ let audio = null;
 const BEEP_MARKED = 880; // Hz
 const BEEP_ALREADY = 520; // lower: the book was already marked
 
-// A short beep and a vibration tell the user what a scan did without looking at the screen:
-// a higher tone when the book was marked, a lower one when it already was.
-function confirmScan(frequency = BEEP_MARKED) {
-  navigator.vibrate?.(frequency === BEEP_MARKED ? 80 : [40, 60, 40]);
+// Browsers only allow sound after a tap, and a scan result arrives long after it (the camera
+// start and the lookup are asynchronous). So the audio is created and unlocked in the Scan tap.
+// Returns a promise that settles once the audio is running (it never rejects).
+function prepareAudio() {
   try {
     audio ??= new AudioContext();
-    audio.resume?.();
-    const oscillator = audio.createOscillator();
-    const gain = audio.createGain();
-    oscillator.frequency.value = frequency;
-    gain.gain.value = 0.1;
-    oscillator.connect(gain).connect(audio.destination);
-    oscillator.start();
-    oscillator.stop(audio.currentTime + 0.08);
+    return Promise.resolve(audio.resume?.()).catch(() => {});
   } catch {
     // no audio available: the status line still shows what happened
+    return Promise.resolve();
   }
+}
+
+// A short beep tells the user what a scan did without looking at the screen:
+// a higher tone when the book was marked, a lower one when it already was.
+function confirmScan(frequency = BEEP_MARKED) {
+  // a context that is still resuming has a frozen clock, so wait for it before scheduling
+  prepareAudio().then(() => {
+    if (audio?.state !== 'running') return;
+    try {
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      const now = audio.currentTime;
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      oscillator.connect(gain).connect(audio.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.15);
+    } catch {
+      // audio went away (closed context): the status line still shows what happened
+    }
+  });
 }
 
 // What is in front of the camera right now. A run lasts until its barcode has been out of view
@@ -334,6 +350,7 @@ async function addScanned(isbn) {
 
 async function openScanner() {
   if (!scanner.hidden) return;
+  prepareAudio(); // still inside the tap, which is what lets sound play later
   const continuous = keepScanning.checked;
   if (continuous) document.getElementById('marked').open = true; // show the list filling up
   const token = ++scanToken;
