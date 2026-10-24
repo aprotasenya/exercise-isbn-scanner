@@ -245,8 +245,8 @@ function prepareAudio() {
   }
 }
 
-// A short beep tells the user what a scan did without looking at the screen:
-// a higher tone when the book was marked, a lower one when it already was.
+// A short beep tells the user, without looking at the screen, that the camera read a barcode:
+// a higher tone for a book that is not marked yet, a lower one for one that already is.
 function confirmScan(frequency = BEEP_MARKED) {
   // a context that is still resuming has a frozen clock, so wait for it before scheduling
   prepareAudio().then(() => {
@@ -321,7 +321,7 @@ async function addScanned(isbn) {
     touchRun(isbn, false);
     showAlreadyMarked(isbn);
     noteRecent(isbn, markedTitle(isbn));
-    return confirmScan(BEEP_ALREADY);
+    return;
   }
 
   touchRun(isbn, true);
@@ -336,7 +336,6 @@ async function addScanned(isbn) {
     // The scan is recorded either way, but if the camera was stopped meanwhile, stay quiet:
     // the status line and the beep now belong to whatever the user is doing.
     if (session !== scanToken) return;
-    confirmScan();
     const unnamed = book.unknown && !names.get(isbn);
     setStatus(unnamed ? `Marked ISBN ${isbn} (not found in Open Library)` : `Marked: ${book.title}`);
   } catch {
@@ -363,6 +362,8 @@ async function openScanner() {
   try {
     const stop = await startScanner(preview, {
       onIsbn(isbn) {
+        // beep as soon as the camera reads the barcode, before any lookup: high = new, low = already marked
+        confirmScan(marked.has(isbn) ? BEEP_ALREADY : BEEP_MARKED);
         if (continuous) return addScanned(isbn);
         closeScanner();
         input.value = isbn;
@@ -434,7 +435,6 @@ async function search(isbn, { push = true, focus = push, fromScan = false } = {}
   if (autoMarked) {
     const added = marked.add(markEntry(book, isbn));
     markedView.render();
-    confirmScan(added ? BEEP_MARKED : BEEP_ALREADY);
     note = `${added ? 'Marked' : 'Already marked'}: ${book.title}`;
   }
   setStatus(note);
