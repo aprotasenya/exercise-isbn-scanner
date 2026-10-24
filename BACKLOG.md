@@ -7,6 +7,7 @@ Ideas that are not part of the current work. Move an item into the plan when it 
 - **Try Goodreads for book data: request `https://www.goodreads.com/book/isbn/{isbn}` and parse the HTML with Beautiful Soup** (https://www.crummy.com/software/BeautifulSoup/bs4/doc/). Beautiful Soup is a Python library, so this needs a small server-side script or service, which today's constraints rule out (static page, no backend, no dependencies); the browser alone can't read Goodreads (no CORS). To settle first: where it runs (a local helper script next to `python3 -m http.server`, or a throwaway experiment script that only prints title, author, rating and cover for the fixture ISBNs, which keeps the app untouched); Goodreads' terms and `robots.txt` (the same scraping concern as the stores: check before building anything on it); and whether the result is worth it compared with the plain Goodreads link the cards already have. Start as an experiment script in `scripts/`, not as an app feature.
 
 ## Next up (after the current iteration)
+- **Rebuild the search zone clearly prioritizing the scan method.** Today the form is a text field with Search, Scan and Keep scanning side by side; the camera is the main way to use the app (on a phone in a shop), typing is the fallback. Rework the top of the page so Scan is the obvious primary action (large, first, with Keep scanning next to it) and the ISBN field and Search read as the secondary way.
 - **Use icons for Ereadian/Goodreads in links** instead of a string name
 - **Ukrainian interface** (no toggle, just Ukrainian).
 

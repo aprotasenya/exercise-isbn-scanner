@@ -60,9 +60,10 @@ function clearWarning() {
 
 const openBook = (isbn) => {
   input.value = isbn;
-  search(isbn, { move: false });
+  search(isbn, { move: false, focus: false }); // no focus: it would pop up the phone keyboard
 };
 const listElements = (id) => ({
+  section: document.getElementById(id),
   count: document.getElementById(`${id}-count`),
   items: document.getElementById(`${id}-list`),
   empty: document.getElementById(`${id}-empty`),
@@ -336,7 +337,6 @@ async function openScanner() {
   if (!scanner.hidden) return;
   prepareAudio(); // still inside the tap, which is what lets sound play later
   const continuous = keepScanning.checked;
-  if (continuous) document.getElementById('scanned').open = true; // show the list filling up
   const token = ++scanToken;
   scanner.hidden = false;
   updateControls();
@@ -434,5 +434,5 @@ updateControls();
 const linkedIsbn = isbnFromHash(location.hash);
 if (linkedIsbn) {
   input.value = linkedIsbn;
-  search(linkedIsbn, { push: false, focus: true, move: false });
+  search(linkedIsbn, { push: false, move: false });
 }

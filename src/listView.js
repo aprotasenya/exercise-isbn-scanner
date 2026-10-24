@@ -46,14 +46,19 @@ export function createMarkToggle({ marked, onChange, onFull }) {
 //   list: a book list (src/bookList.js); filename: for the JSON download; confirmClear(count): the confirm question;
 //   rowButton(book): the button at the end of each row; onOpen(isbn): search for a book from the list;
 //   onChange(): called after Clear, so every list and star in the page is redrawn;
-//   notify(text, isError): status line; elements: { count, items, empty, copy, download, clear }
+//   notify(text, isError): status line; elements: { section, count, items, empty, copy, download, clear }
+// The section (a <details>) opens by itself when the list stops being empty (on load, or at the
+// first book added, also while scanning); after that the user's open/closed choice is left alone.
 export function createListView({ list, filename, confirmClear, rowButton, onOpen, onChange, notify, elements }) {
-  const { count, items, empty, copy, download, clear } = elements;
+  const { section, count, items, empty, copy, download, clear } = elements;
   let locked = false;
+  let wasEmpty = true;
 
   function render() {
     const books = list.list();
     count.textContent = String(books.length);
+    if (books.length > 0 && wasEmpty) section.open = true;
+    wasEmpty = books.length === 0;
     empty.hidden = books.length > 0;
     for (const button of [copy, download]) button.disabled = books.length === 0;
     clear.disabled = books.length === 0 || locked;
