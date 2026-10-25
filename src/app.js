@@ -91,7 +91,7 @@ const scannedView = createListView({
   rowButton: (book) => markToggle.create(book, book.isbn),
   onOpen: openBook,
   onChange: renderLists,
-  notify: (text, isError) => setStatus(text, isError),
+  notify: (text, isError) => setStatus(text, isError, isError ? 0 : NOTE_MS),
   elements: listElements('scanned'),
 });
 const markedView = createListView({
@@ -107,14 +107,26 @@ const markedView = createListView({
   },
   onOpen: openBook,
   onChange: renderLists,
-  notify: (text, isError) => setStatus(text, isError),
+  notify: (text, isError) => setStatus(text, isError, isError ? 0 : NOTE_MS),
   elements: listElements('marked'),
 });
 
-function setStatus(text, isError = false) {
+// `ttl`: the message clears itself after that many ms unless another one replaces it first.
+let statusTimer = null;
+function setStatus(text, isError = false, ttl = 0) {
+  clearTimeout(statusTimer);
   status.textContent = text;
   status.className = isError ? 'error' : '';
+  if (ttl && text) statusTimer = setTimeout(() => setStatus(''), ttl);
 }
+
+// Messages about what was typed (invalid ISBN, camera unavailable, list full) go away as soon as
+// the field is edited; a confirmation (Copied) goes away on its own.
+const NOTE_MS = 4000;
+input.addEventListener('input', () => {
+  setStatus('');
+  clearWarning();
+});
 
 // No book data is fetched: a book is its ISBN, or the name the user typed for it. Titles stored
 // by earlier versions (from Open Library) are kept; renaming updates the stored titles too, so
@@ -219,6 +231,7 @@ function updateControls() {
 // while one is in frame). `hintKey` says which barcode the message belongs to.
 let hintKey = null;
 let hintTimer = null;
+const HINT_MS = 2000; // how long a message stays after its barcode leaves the view (long enough to read)
 
 function showHint(key, text) {
   if (hintKey !== key) {
@@ -226,7 +239,7 @@ function showHint(key, text) {
     setStatus(text);
   }
   clearTimeout(hintTimer);
-  hintTimer = setTimeout(clearHint, 1000);
+  hintTimer = setTimeout(clearHint, HINT_MS);
 }
 
 function clearHint() {
