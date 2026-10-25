@@ -22,12 +22,8 @@
       <button type="button" id="theme" title="Тема: як на пристрої, або світла чи темна">🌓 Авто</button>
     </div>
     <form id="search">
-      <input id="isbn" type="text" placeholder="ISBN, напр. 978-0-14-032872-1" autocomplete="off">
+      <input id="isbn" type="text" placeholder="ISBN, напр. 978-0-14-032872-1" autocomplete="off" aria-label="ISBN">
       <button type="submit">Пошук</button>
-      <button type="button" id="scan">Сканувати</button>
-      <label class="keep" title="Камера лишається ввімкненою, кожна книга додається до «Шуканого»">
-        <input type="checkbox" id="keep-scanning"> Безперервно
-      </label>
     </form>
     <div id="scanner" hidden>
       <video id="preview" playsinline muted></video>
@@ -55,6 +51,15 @@
       </div>
     </details>
   </main>
+  <div class="scan-dock">
+    <label class="keep" title="Камера лишається ввімкненою, кожна книга додається до «Шуканого»">
+      <input type="checkbox" id="keep-scanning"> Безперервно
+    </label>
+    <button type="button" id="scan">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M7 9v6M11 9v6M15 9v6M18 9v6"/></svg>
+      <span id="scan-label">Сканувати</span>
+    </button>
+  </div>
   <div id="snap" aria-hidden="true"></div>
   <script type="module" src="src/app.js"></script>
 </body>

@@ -16,6 +16,7 @@ const status = document.getElementById('status');
 const result = document.getElementById('result');
 const button = form.querySelector('button[type="submit"]');
 const scanButton = document.getElementById('scan');
+const scanLabel = document.getElementById('scan-label');
 const scanner = document.getElementById('scanner');
 const preview = document.getElementById('preview');
 const themeButton = document.getElementById('theme');
@@ -61,7 +62,7 @@ function clearWarning() {
 
 const openBook = (isbn) => {
   input.value = isbn;
-  search(isbn, { move: false, focus: false }); // no focus: it would pop up the phone keyboard
+  search(isbn, { move: false });
 };
 const listElements = (id) => ({
   section: document.getElementById(id),
@@ -206,7 +207,8 @@ function updateControls() {
   const scanning = !scanner.hidden;
   input.disabled = scanning;
   button.disabled = scanning;
-  scanButton.textContent = scanning ? t.stop : t.scan;
+  scanLabel.textContent = scanning ? t.stop : t.scan;
+  scanButton.classList.toggle('stop', scanning);
   keepScanning.disabled = scanning;
   scannedView.setLocked(scanning);
   markedView.setLocked(scanning);
@@ -416,9 +418,9 @@ form.addEventListener('submit', (event) => {
 });
 
 // `push: false` is used when the search comes from the URL itself (load, Back/Forward);
-// those don't add a history entry. `focus` moves the cursor to the field when it is done.
+// those don't add a history entry. A valid search drops the focus from the field, so the phone keyboard closes.
 // `move: false`: the book is only shown again, so it keeps its place in the Scanned list.
-function search(isbn, { push = true, focus = push, move = true } = {}) {
+function search(isbn, { push = true, move = true } = {}) {
   closeScanner();
   result.replaceChildren();
   if (!isValidIsbn(isbn)) return setStatus(t.invalidIsbn, true);
@@ -429,7 +431,7 @@ function search(isbn, { push = true, focus = push, move = true } = {}) {
   clearWarning();
   (move ? noteScanned : noteShown)(isbn, book.title);
   renderBook(book, isbn);
-  if (focus) input.focus();
+  input.blur();
 }
 
 window.addEventListener('popstate', () => {

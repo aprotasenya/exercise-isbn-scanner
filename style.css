@@ -1,11 +1,14 @@
 :root {
   color-scheme: light dark;
-  --bg: #f6f6f4;
-  --fg: #222;
-  --card: #fff;
-  --muted: #555;
-  --error: #b00020;
-  --link: #0b57d0;
+  --bg: #f4efe4;
+  --fg: #2a2823;
+  --card: #fffdf8;
+  --muted: #5e5a50;
+  --error: #b32942;
+  --link: #2f6f6b;
+  --accent: #2f6f6b;
+  --on-accent: #fff;
+  --line: #e4dcc9;
 }
 /* Auto: follow the device unless the user forced light. */
 @media (prefers-color-scheme: dark) {
@@ -15,7 +18,10 @@
     --card: #272726;
     --muted: #a8a8a4;
     --error: #ff8a80;
-    --link: #8ab4f8;
+    --link: #3acb89;
+    --accent: #3acb89;
+    --on-accent: #052e1f;
+    --line: #3a3a38;
   }
 }
 :root[data-theme="light"] { color-scheme: light; }
@@ -26,30 +32,41 @@
   --card: #272726;
   --muted: #a8a8a4;
   --error: #ff8a80;
-  --link: #8ab4f8;
+  --link: #3acb89;
+  --accent: #3acb89;
+  --on-accent: #052e1f;
+  --line: #3a3a38;
 }
 body { font-family: system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--fg); }
 a { color: var(--link); }
-main { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+main { max-width: 640px; margin: 1.25rem auto; padding: 0 1rem 7rem; } /* the bottom room keeps the floating Scan controls off the last row */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.top h1 { margin: 0 0 1rem; }
-#theme { margin-bottom: 1rem; font-size: .9rem; }
-form { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
-#isbn { flex: 1 1 12rem; padding: .5rem; font-size: 1rem; }
-.keep { display: flex; align-items: center; gap: .3rem; font-size: .9rem; white-space: nowrap; }
-button { padding: .5rem 1rem; font-size: 1rem; }
+.top h1 { margin: 0 0 1rem; font-size: 1.5rem; }
+#theme { margin-bottom: 1rem; font-size: .85rem; padding: .35rem .8rem; border-radius: 999px; }
+form { display: flex; align-items: center; gap: .5rem; }
+#isbn { flex: 1 1 auto; min-width: 0; padding: .5rem .75rem; font-size: 1rem; color: var(--fg); background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+button { padding: .5rem 1rem; font-size: 1rem; color: var(--fg); background: var(--card); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; transition: background-color .15s, border-color .15s, opacity .15s; }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible, #isbn:focus-visible, .keep:has(input:focus-visible), summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Scan and Keep scanning float at the bottom right, in thumb reach; they hide while the ISBN field is being typed in. */
+.scan-dock { position: fixed; right: 1rem; bottom: calc(1rem + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: .5rem; }
+body:has(#isbn:focus) .scan-dock { display: none; }
+#scan { display: inline-flex; align-items: center; gap: .5rem; min-height: 56px; padding: 0 1.4rem; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 600; box-shadow: 0 2px 10px rgba(0, 0, 0, .3); }
+#scan.stop { background: var(--error); color: var(--on-accent); }
+.keep { display: flex; align-items: center; gap: .4rem; min-height: 44px; padding: 0 .8rem; font-size: .9rem; white-space: nowrap; background: var(--card); border: 1px solid var(--line); border-radius: 999px; box-shadow: 0 2px 10px rgba(0, 0, 0, .2); cursor: pointer; }
+.keep input { accent-color: var(--accent); }
 #scanner { margin-top: 1rem; }
-#preview { display: block; width: 100%; max-height: 50vh; background: #000; border-radius: 8px; }
+#preview { display: block; width: 100%; max-height: 50vh; background: #000; border-radius: 12px; }
 /* A brief shutter flash over the page when the camera reads a barcode (even if the scanner closes at once). */
 #snap { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: #ffb300; }
 #snap.flash { animation: snap .5s ease-out; }
 #snap.flash.again { background: #1e88e5; }
 #snap.flash.full { background: #e53935; }
 @keyframes snap { from { opacity: .55; } to { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { #snap.flash { animation: none; } }
+@media (prefers-reduced-motion: reduce) { #snap.flash { animation: none; } button, .link-button { transition: none; } }
 #status { min-height: 1.5em; color: var(--muted); }
 #status.error { color: var(--error); }
-.book { background: var(--card); padding: 1rem; border-radius: 8px; }
+.book { background: var(--card); padding: 1rem; border-radius: 12px; border: 1px solid var(--line); }
 .book-head { display: flex; align-items: flex-start; gap: 1rem; }
 .book-head > div { flex: 1 1 auto; min-width: 0; } /* the name block; the star button sits at the right edge, top-aligned with it */
 .book-head .mark-toggle { flex: none; }
@@ -60,21 +77,23 @@ button { padding: .5rem 1rem; font-size: 1rem; }
 .title-edit { background: none; color: inherit; text-align: left; overflow-wrap: anywhere; cursor: text;
   /* a thin dashed line, always there, to show the title can be tapped; offset below the descenders */
   text-decoration: underline dashed; text-decoration-thickness: 1px; text-decoration-color: var(--muted); text-underline-offset: .22em; }
-.title-edit:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.title-edit:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .title-input { border-color: var(--link); background: var(--bg); color: var(--fg); }
 .warning { margin: 1rem 0 0; padding: .6rem .8rem; border-radius: 8px; border: 1px solid var(--error); color: var(--error); background: var(--card); }
 .meta { color: var(--muted); margin: .25rem 0; }
 /* The lookup buttons under the name: the site icon at twice its 32px size, the name beneath. */
 .link-row { display: flex; justify-content: center; gap: 1rem; margin-top: 1rem; }
-.link-button { box-sizing: border-box; width: 88px; height: 88px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px; border: 1px solid var(--muted); border-radius: 8px; color: var(--fg); text-decoration: none; font-size: .75rem; line-height: 1; }
+.link-button { box-sizing: border-box; width: 88px; height: 88px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; color: var(--fg); text-decoration: none; font-size: .75rem; line-height: 1; transition: border-color .15s; }
+.link-button:hover { border-color: var(--accent); }
 .link-button img { width: 64px; height: 64px; border-radius: 6px; }
 .link-button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* a long name is cut, not overflowing */
-.icon-link { box-sizing: border-box; width: 2.75rem; height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--muted); border-radius: 4px; }
+.icon-link { box-sizing: border-box; width: 2.75rem; height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 6px; }
 .icon-link { overflow: hidden; font-size: .6rem; line-height: 1; color: var(--fg); text-align: center; } /* the alt text, if the icon does not load */
 .icon-link img { width: 28px; height: 28px; border-radius: 4px; }
-.link-button:focus-visible, .icon-link:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-.book-list { margin-top: 1.5rem; background: var(--card); padding: .75rem 1rem; border-radius: 8px; }
+.link-button:focus-visible, .icon-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.book-list { margin-top: 1.5rem; background: var(--card); padding: .75rem 1rem; border-radius: 12px; border: 1px solid var(--line); }
 .book-list summary { cursor: pointer; font-weight: 600; }
+.book-list summary::marker { color: var(--accent); }
 .book-list ul { list-style: none; margin: .5rem 0; padding: 0; }
 /* One line per book: the name on the left (cut with an ellipsis when it is too long; the card shows it in
    full), then the two site icons and the star or cross together at the right edge. The buttons are 36px so that
