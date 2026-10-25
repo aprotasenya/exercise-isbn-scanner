@@ -1,5 +1,5 @@
 {
-  "name": "exercise-isbn-reader",
+  "name": "isbn-scanner",
   "private": true,
   "type": "module",
   "scripts": {

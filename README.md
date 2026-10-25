@@ -1,8 +1,8 @@
 # ISBN Reader
 
-[![Test](https://github.com/aprotasenya/exercise-isbn-scanner/actions/workflows/test.yml/badge.svg)](https://github.com/aprotasenya/exercise-isbn-scanner/actions/workflows/test.yml)
+[![Test](https://github.com/oleprota/isbn-scanner/actions/workflows/test.yml/badge.svg)](https://github.com/oleprota/isbn-scanner/actions/workflows/test.yml)
 
-Live: https://aprotasenya.github.io/exercise-isbn-scanner/ (https, so the camera works on a phone)
+Live: https://oleprota.github.io/isbn-scanner/ (https, so the camera works on a phone)
 
 The interface is in Ukrainian. Minimal page: enter or scan an ISBN and get a card with two buttons (the site icons) that look the book up on Ereadian and Goodreads. No book data is fetched from anywhere, so a book is shown as `ISBN <number>` unless you name it (tap the title on its card).
 
