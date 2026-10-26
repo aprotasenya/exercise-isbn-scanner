@@ -420,7 +420,7 @@ async function openScanner(continuous = false) {
 // every book until Stop. Letting go once the fill has started only cancels (the fill drains): it is not a tap.
 const MIN_HOLD_MS = 300;
 const MAX_HOLD_MS = 1000;
-const FILL_DRAIN_MS = 200; // how fast the fill empties when the press is cancelled
+const FILL_DRAIN_MS = 300; // how fast the fill empties when the press is cancelled
 scanButton.style.setProperty('--hold', `${MAX_HOLD_MS - MIN_HOLD_MS}ms`);
 scanButton.style.setProperty('--drain', `${FILL_DRAIN_MS}ms`);
 let startTimer = null;

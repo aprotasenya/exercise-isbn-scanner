@@ -53,14 +53,15 @@ button:focus-visible, #isbn:focus-visible, summary:focus-visible { outline: 2px 
 body:has(#isbn:focus) .scan-dock { display: none; }
 /* On a desktop browser the dock sits higher, closer to where the pointer is; phones keep it at the bottom edge. */
 @media (min-width: 700px) and (pointer: fine) { .scan-dock { left: auto; right: 2rem; transform: none; bottom: 2rem; } }
-#scan { position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: .5rem; min-height: 56px; padding: 0 1.9rem; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 600; box-shadow: 0 4px 18px rgba(0, 0, 0, .5), 0 1px 4px rgba(0, 0, 0, .4); touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+#scan { display: inline-flex; align-items: center; gap: .5rem; min-height: 56px; padding: 0 1.9rem; border: 0; border-radius: 999px; color: var(--on-accent); font-weight: 600; box-shadow: 0 4px 18px rgba(0, 0, 0, .5), 0 1px 4px rgba(0, 0, 0, .4); touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .scan-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; }
 #scan small { font-size: .65rem; font-weight: 400; opacity: .85; }
 #scan.stop small { display: none; }
-/* Holding the button fills it with red from left to right (the fill time is set from app.js); letting go early drains it quickly. */
-#scan::before { content: ""; position: absolute; inset: 0; background: var(--error); transform: scaleX(0); transform-origin: left; transition: transform var(--drain, 200ms) ease-out; }
-#scan.holding::before { transform: scaleX(1); transition: transform var(--hold, 800ms) linear; }
-#scan > * { position: relative; }
+/* Holding the button fills it with red from left to right (the times are set from app.js); letting go early drains it.
+   The fill is a background layer whose width is animated (no moving child inside a rounded, clipped button: that
+   flickers at the edges on phones). */
+#scan { background-color: var(--accent); background-image: linear-gradient(var(--error), var(--error)); background-repeat: no-repeat; background-size: 0% 100%; transition: background-size var(--drain, 300ms) ease-in-out; }
+#scan.holding { background-size: 100% 100%; transition: background-size var(--hold, 800ms) linear; }
 #scan.stop { background: var(--error); color: var(--on-accent); }
 #scanner { margin-top: 1rem; }
 #preview { display: block; width: 100%; max-height: 50vh; background: #000; border-radius: 12px; }
