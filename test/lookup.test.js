@@ -27,7 +27,7 @@ test('returns the cleaned answer and asks for the ISBN', async () => {
     fetchFn: async (url) => { requested = url; return answer(full)(); },
   });
   assert.deepEqual(found, { ...full, title: 'Шлях королів' });
-  assert.equal(requested, `${URL_}/lookup?isbn=9786171299412`);
+  assert.equal(requested, `${URL_}/lookup?isbn=9786171299412&v=3`);
 });
 
 test('an answer with only a title is fine; missing parts are empty', async () => {
@@ -51,6 +51,19 @@ test('every field is checked: long text cut, bad cover, bad author link and bad 
 test('every failure is null and never throws', async () => {
   const cases = [answer({}, 404), answer({ title: '' }), answer({ title: 5 }), answer(null), async () => new Response('<html>', { status: 200 }), async () => { throw new Error('offline'); }];
   for (const fetchFn of cases) assert.equal(await lookupBook('1', { url: URL_, fetchFn }), null);
+});
+
+test('a 429 waits and asks again, then gives up after a few tries', async () => {
+  let calls = 0;
+  const waits = [];
+  const wait = async (ms) => waits.push(ms);
+  const busyOnce = async () => (++calls === 1 ? new Response('{}', { status: 429 }) : answer({ title: 'Late' })());
+  assert.equal((await lookupBook('1', { url: URL_, fetchFn: busyOnce, wait })).title, 'Late');
+  assert.equal(waits.length, 1);
+
+  calls = 0;
+  assert.equal(await lookupBook('1', { url: URL_, fetchFn: async () => { calls++; return new Response('{}', { status: 429 }); }, wait }), null);
+  assert.equal(calls, 4);
 });
 
 test('gives up after the timeout', async () => {

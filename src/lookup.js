@@ -3,6 +3,9 @@
 // gives null and the book stays `ISBN <number>`.
 export const LOOKUP_URL = 'https://isbn-lookup.oleprota.workers.dev'; // the deployed worker (worker/README.md); '' turns the lookup off
 const TIMEOUT_MS = 5000;
+const SHAPE = 3; // the answer's shape, same as `v3` in worker/index.js: it keeps the browser's HTTP cache from serving an answer of an older shape
+const BUSY_WAIT_MS = 5000; // the worker answered 429 (too many lookups at once): the request waits and goes again
+const BUSY_RETRIES = 3;
 
 const clean = (value, max) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, max) : '');
 const AUTHOR_URL = 'https://www.goodreads.com/author/';
@@ -27,14 +30,18 @@ export function cleanAnswer(data) {
   };
 }
 
-// Returns the cleaned answer or null. Never throws.
-export async function lookupBook(isbn, { url = LOOKUP_URL, fetchFn = fetch, timeout = TIMEOUT_MS } = {}) {
+// Returns the cleaned answer or null. Never throws. A 429 puts the request in a queue of sorts: it
+// waits and asks again (up to BUSY_RETRIES times), so the caller's spinner runs until the final answer.
+export async function lookupBook(isbn, { url = LOOKUP_URL, fetchFn = fetch, timeout = TIMEOUT_MS, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
   if (!url) return null;
-  try {
-    const response = await fetchFn(`${url}/lookup?isbn=${encodeURIComponent(isbn)}`, { signal: AbortSignal.timeout(timeout) });
-    if (!response.ok) return null;
-    return cleanAnswer(await response.json());
-  } catch {
-    return null;
+  for (let attempt = 0; attempt <= BUSY_RETRIES; attempt++) {
+    try {
+      const response = await fetchFn(`${url}/lookup?isbn=${encodeURIComponent(isbn)}&v=${SHAPE}`, { signal: AbortSignal.timeout(timeout) });
+      if (response.status !== 429) return response.ok ? cleanAnswer(await response.json()) : null;
+    } catch {
+      return null;
+    }
+    await wait(BUSY_WAIT_MS);
   }
+  return null;
 }
