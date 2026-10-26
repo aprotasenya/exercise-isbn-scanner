@@ -20,7 +20,6 @@ const scanLabel = document.getElementById('scan-label');
 const scanner = document.getElementById('scanner');
 const preview = document.getElementById('preview');
 const themeButton = document.getElementById('theme');
-const keepScanning = document.getElementById('keep-scanning');
 
 function browserStorage() {
   try {
@@ -213,7 +212,7 @@ function renderBook(book, isbn) {
 let stopCamera = null;
 let scanToken = 0;
 
-// The field, Search and the checkbox are locked while the camera is on; the Scan button
+// The field and Search are locked while the camera is on; the Scan button
 // turns into Stop (the way out of a scan).
 function updateControls() {
   const scanning = !scanner.hidden;
@@ -221,7 +220,6 @@ function updateControls() {
   button.disabled = scanning;
   scanLabel.textContent = scanning ? t.stop : t.scan;
   scanButton.classList.toggle('stop', scanning);
-  keepScanning.disabled = scanning;
   scannedView.setLocked(scanning);
   markedView.setLocked(scanning);
 }
@@ -262,7 +260,7 @@ function closeScanner() {
   updateControls();
 }
 
-// "Keep scanning": the camera stays on and each new book is added to Scanned.
+// Continuous scanning (hold the Scan button): the camera stays on and each new book is added to Scanned.
 let audio = null;
 
 const BEEP_NEW = 880; // Hz
@@ -379,10 +377,9 @@ function addScanned(isbn) {
   else setStatus(t.notAdded(book.title), true);
 }
 
-async function openScanner() {
+async function openScanner(continuous = false) {
   if (!scanner.hidden) return;
   prepareAudio(); // still inside the tap, which is what lets sound play later
-  const continuous = keepScanning.checked;
   const token = ++scanToken;
   scanner.hidden = false;
   updateControls();
@@ -418,7 +415,47 @@ async function openScanner() {
   }
 }
 
+// Tap = scan one book. Hold: nothing happens for MIN_HOLD_MS (a tap, or a press not yet meant as a hold),
+// then the button fills with red over the rest of MAX_HOLD_MS, and when it is full the camera stays on and adds
+// every book until Stop. Letting go once the fill has started only cancels (the fill drains): it is not a tap.
+const MIN_HOLD_MS = 300;
+const MAX_HOLD_MS = 1000;
+const FILL_DRAIN_MS = 200; // how fast the fill empties when the press is cancelled
+scanButton.style.setProperty('--hold', `${MAX_HOLD_MS - MIN_HOLD_MS}ms`);
+scanButton.style.setProperty('--drain', `${FILL_DRAIN_MS}ms`);
+let startTimer = null;
+let doneTimer = null;
+let swallowClick = false; // set once the fill starts: the click that ends the press is not a tap or a Stop
+
+function cancelHold() {
+  clearTimeout(startTimer);
+  clearTimeout(doneTimer);
+  scanButton.classList.remove('holding');
+}
+
+scanButton.addEventListener('pointerdown', (event) => {
+  if (!scanner.hidden || (event.pointerType === 'mouse' && event.button !== 0)) return;
+  prepareAudio(); // the hold ends outside a tap, so unlock sound now
+  startTimer = setTimeout(() => {
+    swallowClick = true;
+    scanButton.classList.add('holding');
+    doneTimer = setTimeout(() => {
+      cancelHold();
+      navigator.vibrate?.(30);
+      openScanner(true);
+    }, MAX_HOLD_MS - MIN_HOLD_MS);
+  }, MIN_HOLD_MS);
+});
+for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+  scanButton.addEventListener(type, () => {
+    cancelHold();
+    if (swallowClick) setTimeout(() => { swallowClick = false; }, 50); // after the click that follows the release
+  });
+}
+scanButton.addEventListener('contextmenu', (event) => event.preventDefault());
+
 scanButton.addEventListener('click', () => {
+  if (swallowClick) return;
   if (scanner.hidden) return openScanner();
   closeScanner();
   setStatus('');
