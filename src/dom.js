@@ -6,6 +6,15 @@ export function el(tag, text, className) {
   return node;
 }
 
+// A small turning ring that says a lookup is running (beside a card's title and in list rows).
+export function spinner(label) {
+  const ring = el('span', null, 'spinner');
+  ring.setAttribute('role', 'status');
+  ring.setAttribute('aria-label', label);
+  ring.title = label;
+  return ring;
+}
+
 // A link to a lookup site (opens in a new tab), shown as the site's icon.
 //   big: a card button, the icon with the site's name underneath;
 //   otherwise a small icon-only button. Its image carries the site's name as alt text, which

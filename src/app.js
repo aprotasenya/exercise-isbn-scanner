@@ -5,8 +5,10 @@ import { hashForIsbn, isbnFromHash } from './hash.js';
 import { createListStore, copyListOnce } from './storage.js';
 import { createBookList, isBookEntry } from './bookList.js';
 import { createNames } from './names.js';
+import { createMeta } from './meta.js';
+import { LOOKUP_URL, lookupBook } from './lookup.js';
 import { createListView, createMarkToggle, iconButton } from './listView.js';
-import { el, linkButton } from './dom.js';
+import { el, linkButton, spinner } from './dom.js';
 import { applyTheme, loadTheme, nextTheme, saveTheme } from './theme.js';
 import { THEME_LABELS, t } from './strings.js';
 
@@ -40,6 +42,7 @@ try {
 const scanned = createBookList(createListStore(browserStorage(), 'isbn-reader.scanned'));
 const marked = createBookList(createListStore(browserStorage(), 'isbn-reader.marked'));
 const names = createNames(createListStore(browserStorage(), 'isbn-reader.names'));
+const meta = createMeta(createListStore(browserStorage(), 'isbn-reader.meta'));
 
 // Opening a book from a list shows its card but does not move it in Scanned: only a new
 // search or scan does that.
@@ -90,6 +93,7 @@ const scannedView = createListView({
   rowButton: (book) => markToggle.create(book, book.isbn),
   onOpen: openBook,
   onChange: renderLists,
+  isWaiting: (isbn) => pending.has(isbn),
   notify: (text, isError) => setStatus(text, isError, isError ? 0 : NOTE_MS),
   elements: listElements('scanned'),
 });
@@ -106,6 +110,7 @@ const markedView = createListView({
   },
   onOpen: openBook,
   onChange: renderLists,
+  isWaiting: (isbn) => pending.has(isbn),
   notify: (text, isError) => setStatus(text, isError, isError ? 0 : NOTE_MS),
   elements: listElements('marked'),
 });
@@ -127,18 +132,25 @@ input.addEventListener('input', () => {
   clearWarning();
 });
 
-// No book data is fetched: a book is its ISBN, or the name the user typed for it. Titles stored
-// by earlier versions (from Open Library) are kept; renaming updates the stored titles too, so
-// clearing a typed name falls back to `ISBN <isbn>`.
+// A book is named by, in this order: the name the user typed, the title the lookup service found
+// (see requestMeta), a title stored by earlier versions (from Open Library), `ISBN <isbn>`.
+// Renaming updates the stored titles too, so clearing a typed name falls back to the found title.
 const storedTitle = (isbn) =>
   [scanned, marked].map((l) => l.list().find((b) => b.isbn === isbn)?.title).find(Boolean);
-const bookFor = (isbn) => ({ title: names.get(isbn) || storedTitle(isbn) || t.isbnTitle(isbn) });
+const fallbackTitle = (isbn) => meta.get(isbn)?.title || t.isbnTitle(isbn);
+const bookFor = (isbn) => ({ title: names.get(isbn) || meta.get(isbn)?.title || storedTitle(isbn) || t.isbnTitle(isbn) });
 
 // The title on a card is also where the book is named: tap it to type a name (Enter or leaving
 // the field saves, Escape cancels); an empty name goes back to `ISBN <number>`. The name is saved
 // per ISBN and also updates the Scanned and Marked entries for that book.
-function titleHeading(book, isbn) {
+// Returns the heading, `update(title)` for a title that arrives later from the lookup, and
+// `setWaiting(on)` for the spinner beside the title that shows the lookup is still running.
+function titleHeading(book, isbn, waiting) {
   const heading = el('h2', null, 'book-title');
+  const slot = el('span', null, 'title-slot'); // the title button or the editor field
+  const ring = spinner(t.lookingUp);
+  heading.append(slot);
+  const setWaiting = (on) => (on ? heading.append(ring) : ring.remove());
 
   // `refocus`: the editor was closed from the keyboard, so keep the focus on the title
   // (otherwise it would fall back to the top of the page).
@@ -147,15 +159,16 @@ function titleHeading(book, isbn) {
     title.type = 'button';
     title.title = t.editName;
     title.addEventListener('click', startEditing);
-    heading.replaceChildren(title);
+    slot.classList.remove('editing');
+    slot.replaceChildren(title);
     if (refocus) title.focus();
   }
 
-  function save(raw) {
+  function save(raw, initial) {
     const value = raw.trim().replace(/\s+/g, ' ');
-    if (value === book.title) return; // unchanged: this also keeps titles saved by earlier versions
-    const name = value.slice(0, 120) === t.isbnTitle(isbn) ? '' : value;
-    const title = names.set(isbn, name) || t.isbnTitle(isbn);
+    if (value === initial) return; // unchanged: this also keeps titles saved by earlier versions
+    const name = value.slice(0, 120) === fallbackTitle(isbn) ? '' : value;
+    const title = names.set(isbn, name) || fallbackTitle(isbn);
     if (title === book.title) return; // e.g. an empty name on a card that already shows the default
     book.title = title;
     marked.rename(isbn, book.title);
@@ -167,14 +180,15 @@ function titleHeading(book, isbn) {
     const field = el('input', null, 'title-input');
     field.type = 'text';
     field.maxLength = 120;
-    field.value = book.title;
-    field.placeholder = t.isbnTitle(isbn); // what an empty name turns back into
+    const initial = book.title; // a title found by the lookup meanwhile is not a change made here
+    field.value = initial;
+    field.placeholder = fallbackTitle(isbn); // what an empty name turns back into
     field.setAttribute('aria-label', t.nameLabel);
     let finished = false;
     const finish = (keep, refocus) => {
       if (finished) return; // Enter and the blur that follows it must not save twice
       finished = true;
-      if (keep) save(field.value);
+      if (keep) save(field.value, initial);
       showTitle(refocus);
     };
     field.addEventListener('keydown', (event) => {
@@ -185,26 +199,88 @@ function titleHeading(book, isbn) {
       if (event.key === 'Escape') finish(false, true);
     });
     field.addEventListener('blur', () => finish(true, false));
-    heading.replaceChildren(field);
+    slot.classList.add('editing');
+    slot.replaceChildren(field);
     field.focus();
     field.select();
   }
 
+  // while the editor is open the field keeps what the user typed; the new title shows after it closes
+  function update(title) {
+    book.title = title;
+    if (slot.querySelector('button')) showTitle();
+  }
+
   showTitle();
-  return heading;
+  setWaiting(waiting);
+  return { heading, update, setWaiting };
+}
+
+// The card on screen, so that a lookup answer can reach it: { card, isbn, book, update, setCover }.
+let shown = null;
+
+function coverImage(src) {
+  const img = el('img', null, 'cover');
+  img.alt = '';
+  img.referrerPolicy = 'no-referrer';
+  img.src = src;
+  img.addEventListener('error', () => img.remove());
+  return img;
 }
 
 function renderBook(book, isbn) {
   const card = el('article', null, 'book');
   const head = el('div', null, 'book-head');
   const body = el('div');
-  body.append(titleHeading(book, isbn));
+  const { heading, update, setWaiting } = titleHeading(book, isbn, pending.has(isbn));
+  body.append(heading);
+  const setCover = (src) => {
+    head.querySelector('.cover')?.remove();
+    if (src) head.prepend(coverImage(src));
+  };
   // the star sits at the right edge of the card, like the buttons at the end of the list rows
   head.append(body, markToggle.create(book, isbn));
+  setCover(meta.get(isbn)?.image);
   const links = el('div', null, 'link-row');
   links.append(...isbnLinks(isbn).map((link) => linkButton(link, { big: true })));
   card.append(head, links);
   result.replaceChildren(card);
+  shown = { card, isbn, book, update, setCover, setWaiting };
+}
+
+// Asks the lookup service for the book's name and cover, in the background: the card, the beep and
+// "Додано" never wait for it, and a failure is silent. One request per ISBN per page load.
+const asked = new Set();
+const pending = new Set(); // asked and not answered yet: its card shows a spinner beside the title
+
+function requestMeta(isbn) {
+  if (!LOOKUP_URL || meta.get(isbn) || asked.has(isbn)) return;
+  asked.add(isbn);
+  pending.add(isbn);
+  renderLists(); // the rows of this book show the spinner too (several lookups can run at once while scanning)
+  lookupBook(isbn).then((found) => {
+    pending.delete(isbn);
+    if (found) return applyMeta(isbn, found);
+    if (shownCard(isbn)) shown.setWaiting(false);
+    renderLists();
+  });
+}
+
+const shownCard = (isbn) => shown?.isbn === isbn && result.contains(shown.card);
+
+// A found title only replaces the default `ISBN <number>`: never a typed name or an older title.
+function applyMeta(isbn, found) {
+  meta.set(isbn, found);
+  for (const list of [scanned, marked]) {
+    if (list.list().find((b) => b.isbn === isbn)?.title === t.isbnTitle(isbn)) list.rename(isbn, found.title);
+  }
+  // an answer for a card that is no longer on screen only fills the cache
+  if (shownCard(isbn)) {
+    shown.setWaiting(false);
+    if (shown.book.title === t.isbnTitle(isbn)) shown.update(found.title);
+    shown.setCover(found.image);
+  }
+  renderLists();
 }
 
 // Camera scanning. `scanToken` lets a Stop pressed while the permission prompt is still
@@ -373,8 +449,10 @@ function addScanned(isbn) {
   }
   const book = bookFor(isbn);
   touchRun(isbn, true);
-  if (noteScanned(isbn, book.title)) setStatus(t.added(book.title));
-  else setStatus(t.notAdded(book.title), true);
+  if (noteScanned(isbn, book.title)) {
+    setStatus(t.added(book.title));
+    requestMeta(isbn);
+  } else setStatus(t.notAdded(book.title), true);
 }
 
 async function openScanner(continuous = false) {
@@ -480,6 +558,7 @@ function search(isbn, { push = true, move = true } = {}) {
   setStatus('');
   clearWarning();
   (move ? noteScanned : noteShown)(isbn, book.title);
+  requestMeta(isbn); // before the card, so that the card knows to show the spinner
   renderBook(book, isbn);
   input.blur();
 }

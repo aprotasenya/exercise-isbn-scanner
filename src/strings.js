@@ -27,6 +27,7 @@ export const t = {
   invalidIsbn: 'Введіть дійсний ISBN-10 або ISBN-13.',
   notABook: 'Це не ISBN книги.',
   cameraUnavailable: 'Камера недоступна. Введіть ISBN вручну.',
+  lookingUp: 'Шукаю назву…',
   nameLabel: 'Назва книги',
   editName: 'Змінити назву',
   mark: 'Вибрати',

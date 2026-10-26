@@ -1,0 +1,12 @@
+name = "isbn-lookup"
+main = "index.js"
+compatibility_date = "2026-10-01"
+
+# At most 5 lookups of new ISBNs per 10 seconds from one address (answers served from the cache are not counted).
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 5
+  period = 10

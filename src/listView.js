@@ -1,4 +1,4 @@
-import { el, linkButton } from './dom.js';
+import { el, linkButton, spinner } from './dom.js';
 import { books, t } from './strings.js';
 import { isbnLinks } from './links.js';
 
@@ -45,10 +45,11 @@ export function createMarkToggle({ marked, onChange, onFull }) {
 //   list: a book list (src/bookList.js); confirmClear(booksText): the confirm question, given the count as text ("3 книги");
 //   rowButton(book): the button at the end of each row; onOpen(isbn): search for a book from the list;
 //   onChange(): called after Clear, so every list and star in the page is redrawn;
+//   isWaiting(isbn): true while the book's name is still being looked up (the row shows a spinner);
 //   notify(text, isError): status line; elements: { section, count, items, empty, copy, clear }
 // The section (a <details>) opens by itself when the list stops being empty (on load, or at the
 // first book added, also while scanning); after that the user's open/closed choice is left alone.
-export function createListView({ list, confirmClear, rowButton, onOpen, onChange, notify, elements }) {
+export function createListView({ list, confirmClear, rowButton, onOpen, onChange, isWaiting = () => false, notify, elements }) {
   const { section, count, items, empty, copy, clear } = elements;
   let locked = false;
   let wasEmpty = true;
@@ -73,7 +74,9 @@ export function createListView({ list, confirmClear, rowButton, onOpen, onChange
         ...isbnLinks(book.isbn).map((link) => linkButton(link)),
         rowButton(book),
       );
-      item.append(open, actions);
+      item.append(open);
+      if (isWaiting(book.isbn)) item.append(spinner(t.lookingUp));
+      item.append(actions);
       return item;
     }));
   }

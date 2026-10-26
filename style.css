@@ -81,7 +81,14 @@ body:has(#scanner:not([hidden])) #status:empty { display: block; }
 .book-head { display: flex; align-items: flex-start; gap: 1rem; }
 .book-head > div { flex: 1 1 auto; min-width: 0; } /* the name block; the star button sits at the right edge, top-aligned with it */
 .book-head .mark-toggle { flex: none; }
-.book-title { margin: 0; }
+.book-head .cover { flex: none; width: 56px; max-height: 84px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); }
+.book-title { margin: 0; display: flex; align-items: center; gap: .5rem; }
+.title-slot { flex: 0 1 auto; min-width: 0; } /* hugs the title so the spinner sits right after its last line */
+.title-slot.editing { flex: 1 1 auto; } /* the editor field takes the whole line */
+/* a small ring that turns while the lookup runs; it goes away when the answer (or its absence) is known */
+.spinner { flex: none; width: .9rem; height: .9rem; box-sizing: border-box; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
 /* The title looks like heading text with a dashed underline; tapping it swaps in a field with the same font.
    Both share one box (the negative margin cancels the padding and border), so nothing moves when editing starts. */
 .title-edit, .title-input { display: block; box-sizing: border-box; margin: 0 calc(-.25rem - 1px); width: calc(100% + .5rem + 2px); padding: 0 .25rem; border: 1px solid transparent; border-radius: 4px; font: inherit; }
