@@ -79,8 +79,8 @@ export function createHandler({ fetchFn, cache, wait = (ms) => new Promise((reso
     const isbn = normalizeIsbn(url.searchParams.get('isbn') ?? '');
     if (!isValidIsbn(isbn)) return json({ error: 'invalid isbn' }, 400, 0, cors);
 
-    // v2: answers cached by the first version may hold a wrongly remembered miss
-    const key = new Request(`https://lookup.invalid/v2/${isbn}`);
+    // the version changes with the answer's shape (v3: series, author and rating) or when old cached answers must go
+    const key = new Request(`https://lookup.invalid/v3/${isbn}`);
     const cached = await cache.match(key);
     if (cached) return new Response(cached.body, { status: cached.status, headers: { ...Object.fromEntries(cached.headers), ...cors } });
 

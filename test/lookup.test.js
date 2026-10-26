@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lookupBook } from '../src/lookup.js';
-import { createMeta } from '../src/meta.js';
+import { cleanAnswer, lookupBook } from '../src/lookup.js';
+import { META_VERSION, createMeta } from '../src/meta.js';
 
 const URL_ = 'https://lookup.example';
 const answer = (body, status = 200) => async () => new Response(JSON.stringify(body), { status });
@@ -12,20 +12,40 @@ test('does nothing without a service address', async () => {
   assert.equal(asked, false);
 });
 
-test('returns a clean title and an https cover', async () => {
+const full = {
+  title: '  Шлях   королів ',
+  image: 'https://m.media-amazon.com/a.jpg',
+  series: { name: 'Хроніки Буресвітла', number: '1' },
+  author: { name: 'Brandon Sanderson', url: 'https://www.goodreads.com/author/show/38550.Brandon_Sanderson' },
+  rating: { value: 4.66, count: 734385 },
+};
+
+test('returns the cleaned answer and asks for the ISBN', async () => {
   let requested;
   const found = await lookupBook('9786171299412', {
     url: URL_,
-    fetchFn: async (url) => { requested = url; return answer({ title: '  Шлях   королів ', image: 'https://m.media-amazon.com/a.jpg' })(); },
+    fetchFn: async (url) => { requested = url; return answer(full)(); },
   });
-  assert.deepEqual(found, { title: 'Шлях королів', image: 'https://m.media-amazon.com/a.jpg' });
+  assert.deepEqual(found, { ...full, title: 'Шлях королів' });
   assert.equal(requested, `${URL_}/lookup?isbn=9786171299412`);
 });
 
-test('a title is cut to 120 characters; a cover that is not https is dropped', async () => {
-  const found = await lookupBook('1', { url: URL_, fetchFn: answer({ title: 'x'.repeat(300), image: 'javascript:alert(1)' }) });
+test('an answer with only a title is fine; missing parts are empty', async () => {
+  assert.deepEqual(await lookupBook('1', { url: URL_, fetchFn: answer({ title: 'Only' }) }), { title: 'Only', image: '', series: null, author: null, rating: null });
+});
+
+test('every field is checked: long text cut, bad cover, bad author link and bad rating dropped', async () => {
+  const found = await lookupBook('1', {
+    url: URL_,
+    fetchFn: answer({ title: 'x'.repeat(300), image: 'javascript:alert(1)', series: { name: 's'.repeat(200), number: 5 }, author: { name: 'A', url: 'javascript:alert(1)' }, rating: { value: 7, count: 3 } }),
+  });
   assert.equal(found.title.length, 120);
   assert.equal(found.image, '');
+  assert.equal(found.series.name.length, 80);
+  assert.equal(found.series.number, '');
+  assert.deepEqual(found.author, { name: 'A', url: '' });
+  assert.equal(found.rating, null);
+  assert.equal(cleanAnswer({ title: 'T', rating: { value: 4, count: 2.5 } }).rating, null);
 });
 
 test('every failure is null and never throws', async () => {
@@ -43,14 +63,20 @@ function memoryStore(initial = []) {
   return { read: () => list, write: (next) => { list = next; } };
 }
 
-test('meta keeps one entry per ISBN, newest first, up to its limit', () => {
+test('meta keeps one entry per ISBN, newest first, up to its limit, and stamps its version', () => {
   const meta = createMeta(memoryStore(), 2);
   meta.set('1', { title: 'One' });
   meta.set('2', { title: 'Two', image: 'https://x/2.jpg' });
-  meta.set('1', { title: 'One again' });
+  meta.set('1', { title: 'One again', rating: { value: 4, count: 3 } });
   meta.set('3', { title: 'Three' });
   assert.equal(meta.get('2'), null); // pushed out
-  assert.deepEqual(meta.get('1'), { isbn: '1', title: 'One again', image: '' });
+  assert.deepEqual(meta.get('1'), { title: 'One again', rating: { value: 4, count: 3 }, isbn: '1', v: META_VERSION });
+});
+
+test('an entry from an older version is still read, but is not the current version', () => {
+  const meta = createMeta(memoryStore([{ isbn: '1', title: 'Old (Series #1)', image: '' }]));
+  assert.equal(meta.get('1').title, 'Old (Series #1)');
+  assert.notEqual(meta.get('1').v, META_VERSION);
 });
 
 test('meta ignores corrupt stored entries', () => {

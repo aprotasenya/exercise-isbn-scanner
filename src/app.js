@@ -5,7 +5,8 @@ import { hashForIsbn, isbnFromHash } from './hash.js';
 import { createListStore, copyListOnce } from './storage.js';
 import { createBookList, isBookEntry } from './bookList.js';
 import { createNames } from './names.js';
-import { createMeta } from './meta.js';
+import { META_VERSION, createMeta } from './meta.js';
+import { factsBlock, ratingBlock } from './details.js';
 import { LOOKUP_URL, lookupBook } from './lookup.js';
 import { createListView, createMarkToggle, iconButton } from './listView.js';
 import { el, linkButton, spinner } from './dom.js';
@@ -216,7 +217,7 @@ function titleHeading(book, isbn, waiting) {
   return { heading, update, setWaiting };
 }
 
-// The card on screen, so that a lookup answer can reach it: { card, isbn, book, update, setCover }.
+// The card on screen, so that a lookup answer can reach it: { card, isbn, book, update, setDetails, setWaiting }.
 let shown = null;
 
 function coverImage(src) {
@@ -231,21 +232,26 @@ function coverImage(src) {
 function renderBook(book, isbn) {
   const card = el('article', null, 'book');
   const head = el('div', null, 'book-head');
-  const body = el('div');
+  const body = el('div', null, 'book-main');
   const { heading, update, setWaiting } = titleHeading(book, isbn, pending.has(isbn));
   body.append(heading);
-  const setCover = (src) => {
+  const facts = el('div', null, 'facts-slot');
+  // what the lookup found: the cover beside the title, the rating under it, series and author under the head
+  const setDetails = (found) => {
     head.querySelector('.cover')?.remove();
-    if (src) head.prepend(coverImage(src));
+    if (found?.image) head.prepend(coverImage(found.image));
+    body.querySelector('.rating')?.remove();
+    if (found?.rating) heading.after(ratingBlock(found.rating));
+    facts.replaceChildren(...[found && factsBlock(found)].filter(Boolean));
   };
   // the star sits at the right edge of the card, like the buttons at the end of the list rows
   head.append(body, markToggle.create(book, isbn));
-  setCover(meta.get(isbn)?.image);
+  setDetails(meta.get(isbn));
   const links = el('div', null, 'link-row');
   links.append(...isbnLinks(isbn).map((link) => linkButton(link, { big: true })));
-  card.append(head, links);
+  card.append(head, facts, links);
   result.replaceChildren(card);
-  shown = { card, isbn, book, update, setCover, setWaiting };
+  shown = { card, isbn, book, update, setDetails, setWaiting };
 }
 
 // Asks the lookup service for the book's name and cover, in the background: the card, the beep and
@@ -254,7 +260,8 @@ const asked = new Set();
 const pending = new Set(); // asked and not answered yet: its card shows a spinner beside the title
 
 function requestMeta(isbn) {
-  if (!LOOKUP_URL || meta.get(isbn) || asked.has(isbn)) return;
+  // an entry saved by an older version lacks the new fields: it is shown until the answer replaces it
+  if (!LOOKUP_URL || meta.get(isbn)?.v === META_VERSION || asked.has(isbn)) return;
   asked.add(isbn);
   pending.add(isbn);
   renderLists(); // the rows of this book show the spinner too (several lookups can run at once while scanning)
@@ -268,17 +275,20 @@ function requestMeta(isbn) {
 
 const shownCard = (isbn) => shown?.isbn === isbn && result.contains(shown.card);
 
-// A found title only replaces the default `ISBN <number>`: never a typed name or an older title.
+// A found title only replaces the default `ISBN <number>` or the title an earlier lookup of this
+// book gave (older versions kept the series bracket in it): never a typed name or another title.
 function applyMeta(isbn, found) {
+  const earlier = meta.get(isbn)?.title;
+  const replaceable = (title) => title === t.isbnTitle(isbn) || title === earlier;
   meta.set(isbn, found);
   for (const list of [scanned, marked]) {
-    if (list.list().find((b) => b.isbn === isbn)?.title === t.isbnTitle(isbn)) list.rename(isbn, found.title);
+    if (replaceable(list.list().find((b) => b.isbn === isbn)?.title)) list.rename(isbn, found.title);
   }
   // an answer for a card that is no longer on screen only fills the cache
   if (shownCard(isbn)) {
     shown.setWaiting(false);
-    if (shown.book.title === t.isbnTitle(isbn)) shown.update(found.title);
-    shown.setCover(found.image);
+    if (replaceable(shown.book.title)) shown.update(found.title);
+    shown.setDetails(found);
   }
   renderLists();
 }

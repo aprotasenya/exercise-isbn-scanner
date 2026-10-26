@@ -34,17 +34,51 @@ const decode = (s) =>
 
 const text = (value, max) => (typeof value === 'string' ? decode(value).trim().replace(/\s+/g, ' ').slice(0, max) : '');
 
-// `{ title, authors, image }` for the first Book in the page, or null (no title = no data).
+// "Шлях королів (Хроніки Буресвітла #1)" -> the title without any trailing brackets, and the series
+// from the bracket that has a "#number" in it ({ name, number }, or null). Brackets without a number
+// ("(Illustrated)") are only dropped. A title that is nothing but a bracket is left alone.
+export function splitTitle(name) {
+  let title = name;
+  let series = null;
+  for (;;) {
+    const bracket = /\s*\(([^()]*)\)\s*$/.exec(title);
+    if (!bracket || bracket.index === 0) break;
+    title = title.slice(0, bracket.index);
+    const numbered = /^(.*?)[,\s]*#\s*(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)$/.exec(bracket[1].trim());
+    if (numbered && numbered[1].trim() && !series) series = { name: numbered[1].trim(), number: numbered[2].replace(/\s+/g, '') };
+  }
+  return { title: title.trim(), series };
+}
+
+const AUTHOR_URL = 'https://www.goodreads.com/author/';
+
+// The first author: { name, url } (the url only when it is a Goodreads author page).
+function firstAuthor(value) {
+  const person = [value].flat().find((p) => text(p?.name, 100));
+  if (!person) return null;
+  return { name: text(person.name, 100), url: typeof person.url === 'string' && person.url.startsWith(AUTHOR_URL) ? person.url : '' };
+}
+
+// { value, count } from schema.org's aggregateRating, or null when nobody has rated the book.
+function ratingOf(rating) {
+  const value = Number(rating?.ratingValue);
+  const count = Number(rating?.ratingCount);
+  return value > 0 && value <= 5 && Number.isInteger(count) && count > 0 ? { value, count } : null;
+}
+
+// `{ title, series, author, rating, image }` for the first Book in the page, or null (no title = no data).
 export function parseBook(html) {
   const book = jsonLdBlocks(html)
     .flatMap((block) => (Array.isArray(block) ? block : [block]))
     .find((block) => block?.['@type'] === 'Book');
-  const title = text(book?.name, 200);
-  if (!title) return null;
-  const people = [book.author].flat().map((person) => text(person?.name, 100)).filter(Boolean);
+  const name = text(book?.name, 200);
+  if (!name) return null;
+  const { title, series } = splitTitle(name);
   return {
     title,
-    authors: [...new Set(people)].slice(0, 5),
+    series,
+    author: firstAuthor(book.author),
+    rating: ratingOf(book.aggregateRating),
     image: typeof book.image === 'string' && book.image.startsWith('https://') ? book.image : '',
   };
 }

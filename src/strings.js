@@ -15,6 +15,12 @@ export const books = (n) => `${n} ${plural(n, ['книга', 'книги', 'кн
 
 export const listNames = { scanned: 'Шукане', marked: 'Вибране' };
 
+// "4.66" and "734 385" (grouped for the Ukrainian locale) for a rating { value, count }.
+export const formatRating = ({ value, count }) => ({
+  value: value.toFixed(2),
+  count: new Intl.NumberFormat('uk-UA').format(count),
+});
+
 export const THEME_LABELS = { auto: '🌓 Авто', light: '☀️ Світла', dark: '🌙 Темна' };
 export const THEME_NAMES = { auto: 'авто', light: 'світла', dark: 'темна' };
 
@@ -28,6 +34,10 @@ export const t = {
   notABook: 'Це не ISBN книги.',
   cameraUnavailable: 'Камера недоступна. Введіть ISBN вручну.',
   lookingUp: 'Шукаю назву…',
+  ratingLabel: 'Рейтинг на Goodreads',
+  ratingTitle: (value, count) => `Рейтинг на Goodreads: ${value} з 5, ${count} оцінок`,
+  seriesLabel: 'Серія',
+  authorLabel: 'Автор',
   nameLabel: 'Назва книги',
   editName: 'Змінити назву',
   mark: 'Вибрати',

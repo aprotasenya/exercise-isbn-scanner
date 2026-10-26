@@ -10,3 +10,7 @@ export function isbnLinks(isbn) {
     { name: 'Goodreads', url: `https://www.goodreads.com/book/isbn/${q}`, icon: 'icons/goodreads.png', title: t.linkTitle(isbn, 'Goodreads') },
   ];
 }
+
+// A Goodreads search for a series by its name. The series' own page has an id that the lookup does
+// not return, so a search stands in for it.
+export const seriesUrl = (name) => `https://www.goodreads.com/search?q=${encodeURIComponent(name)}`;

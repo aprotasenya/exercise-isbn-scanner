@@ -37,3 +37,11 @@ test('every theme has a label and a name', () => {
     assert.match(t.themeAria(theme), /^Тема: /);
   }
 });
+
+test('formatRating shows two decimals and groups the count', async () => {
+  const { formatRating } = await import('../src/strings.js');
+  const { value, count } = formatRating({ value: 4.5, count: 734385 });
+  assert.equal(value, '4.50');
+  assert.equal(count.replace(/\s/g, ' '), '734 385'); // the group separator is a no-break space
+  assert.equal(formatRating({ value: 3, count: 12 }).count, '12');
+});

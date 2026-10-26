@@ -4,7 +4,7 @@ import { createHandler } from '../worker/index.js';
 
 const ISBN = '9786171299412'; // valid; see test/fixtures/isbns.json for more
 const ORIGIN = 'https://oleprota.github.io';
-const html = `<script type="application/ld+json">${JSON.stringify({ '@type': 'Book', name: 'Title', image: 'https://m.media-amazon.com/a.jpg', author: [{ name: 'A' }] })}</script>`;
+const html = `<script type="application/ld+json">${JSON.stringify({ '@type': 'Book', name: 'Title', image: 'https://m.media-amazon.com/a.jpg', author: [{ name: 'A', url: 'https://www.goodreads.com/author/show/1.A' }], aggregateRating: { ratingValue: 4.5, ratingCount: 10 } })}</script>`;
 
 function memoryCache() {
   const map = new Map();
@@ -33,7 +33,7 @@ test('returns the book and allows the app origin', async () => {
   const response = await get(`?isbn=${ISBN}`);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('access-control-allow-origin'), ORIGIN);
-  assert.deepEqual(await response.json(), { title: 'Title', authors: ['A'], image: 'https://m.media-amazon.com/a.jpg', url: 'https://www.goodreads.com/book/show/1' });
+  assert.deepEqual(await response.json(), { title: 'Title', series: null, author: { name: 'A', url: 'https://www.goodreads.com/author/show/1.A' }, rating: { value: 4.5, count: 10 }, image: 'https://m.media-amazon.com/a.jpg', url: 'https://www.goodreads.com/book/show/1' });
   assert.deepEqual(calls, [`https://www.goodreads.com/book/isbn/${ISBN}`]);
 });
 
