@@ -5,6 +5,7 @@ import { hashForIsbn, isbnFromHash } from './hash.js';
 import { createListStore, copyListOnce } from './storage.js';
 import { createBookList, isBookEntry } from './bookList.js';
 import { createNames } from './names.js';
+import { createTitles } from './titles.js';
 import { META_VERSION, createMeta } from './meta.js';
 import { factsBlock, ratingBlock } from './details.js';
 import { LOOKUP_URL, lookupBook } from './lookup.js';
@@ -133,13 +134,11 @@ input.addEventListener('input', () => {
   clearWarning();
 });
 
-// A book is named by, in this order: the name the user typed, the title the lookup service found
-// (see requestMeta), a title stored by earlier versions (from Open Library), `ISBN <isbn>`.
-// Renaming updates the stored titles too, so clearing a typed name falls back to the found title.
-const storedTitle = (isbn) =>
-  [scanned, marked].map((l) => l.list().find((b) => b.isbn === isbn)?.title).find(Boolean);
-const fallbackTitle = (isbn) => meta.get(isbn)?.title || t.isbnTitle(isbn);
-const bookFor = (isbn) => ({ title: names.get(isbn) || meta.get(isbn)?.title || storedTitle(isbn) || t.isbnTitle(isbn) });
+// How a book is named: see src/titles.js. Renaming updates the stored titles too, so clearing a
+// typed name falls back to the found title (requestMeta).
+const titles = createTitles({ names, meta, lists: [scanned, marked] });
+const fallbackTitle = titles.fallback;
+const bookFor = (isbn) => ({ title: titles.of(isbn) });
 
 // The title on a card is also where the book is named: tap it to type a name (Enter or leaving
 // the field saves, Escape cancels); an empty name goes back to `ISBN <number>`. The name is saved
@@ -278,8 +277,7 @@ const shownCard = (isbn) => shown?.isbn === isbn && result.contains(shown.card);
 // A found title only replaces the default `ISBN <number>` or the title an earlier lookup of this
 // book gave (older versions kept the series bracket in it): never a typed name or another title.
 function applyMeta(isbn, found) {
-  const earlier = meta.get(isbn)?.title;
-  const replaceable = (title) => title === t.isbnTitle(isbn) || title === earlier;
+  const replaceable = titles.replaceable(isbn);
   meta.set(isbn, found);
   for (const list of [scanned, marked]) {
     if (replaceable(list.list().find((b) => b.isbn === isbn)?.title)) list.rename(isbn, found.title);

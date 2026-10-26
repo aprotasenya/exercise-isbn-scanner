@@ -53,6 +53,7 @@ export function createListView({ list, confirmClear, rowButton, onOpen, onChange
   const { section, count, items, empty, copy, clear } = elements;
   let locked = false;
   let wasEmpty = true;
+  let stale = false; // a closed section is not redrawn (up to 1000 rows per scan); it catches up when opened
 
   function render() {
     const books = list.list();
@@ -62,6 +63,8 @@ export function createListView({ list, confirmClear, rowButton, onOpen, onChange
     empty.hidden = books.length > 0;
     copy.disabled = books.length === 0;
     clear.disabled = books.length === 0 || locked;
+    stale = !section.open;
+    if (stale) return;
     items.replaceChildren(...books.map((book) => {
       const item = el('li');
       const open = el('button', book.title, 'open');
@@ -80,6 +83,10 @@ export function createListView({ list, confirmClear, rowButton, onOpen, onChange
       return item;
     }));
   }
+
+  section.addEventListener('toggle', () => {
+    if (section.open && stale) render();
+  });
 
   // While the camera is on, opening a book (a search) and Clear are locked.
   function setLocked(value) {
