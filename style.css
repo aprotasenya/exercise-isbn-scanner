@@ -125,13 +125,23 @@ body:has(#scanner:not([hidden])) #status:empty { display: block; }
 .icon-link img { width: 28px; height: 28px; border-radius: 4px; }
 .link-button:focus-visible, .icon-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .book-list { margin-top: 1.5rem; background: var(--card); padding: .75rem 1rem; border-radius: 12px; border: 1px solid var(--line); }
-.book-list summary { cursor: pointer; font-weight: 600; }
+.book-list summary { position: relative; cursor: pointer; font-weight: 600; line-height: 2.25rem; padding-right: 2.75rem; }
+/* The sort button sits at the right edge of the header; its menu drops under it. */
+.book-list .sort-button { position: absolute; right: 0; top: 0; font-weight: 400; }
+.sort-menu { position: absolute; right: 0; top: 100%; z-index: 2; display: flex; flex-direction: column; min-width: 11rem; padding: .25rem; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 4px 18px rgba(0, 0, 0, .35); font-weight: 400; line-height: 1.2; }
+.sort-menu[hidden] { display: none; }
+.sort-menu button { border: 0; background: none; text-align: left; padding: .6rem .75rem; font-size: .95rem; }
+.sort-menu button[aria-pressed="true"] { color: var(--accent); font-weight: 600; }
+.sort-menu button[aria-pressed="true"]::before { content: "✓ "; }
+.sort-menu button[aria-pressed="false"]::before { content: "\00a0\00a0 "; }
 .book-list summary::marker { color: var(--accent); }
 .book-list ul { list-style: none; margin: .5rem 0; padding: 0; }
 /* One line per book: the name on the left (cut with an ellipsis when it is too long; the card shows it in
    full), then the two site icons and the star or cross together at the right edge. The buttons are 36px so that
    a standard name like "ISBN 9789661092999" still fits in full next to them at 360px. */
 .book-list li { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .5rem; padding: .35rem 0; } /* wraps only when the row is too narrow to give the name 8rem (very small screens, huge fonts): the buttons then drop under it, still right-aligned */
+.row-rating { flex: none; display: inline-flex; align-items: center; gap: .2rem; font-size: .95rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+.row-star { color: var(--star); }
 .row-actions { display: flex; flex: none; align-items: center; gap: .375rem; margin-left: auto; }
 .book-list .open { display: block; flex: 1 1 8rem; min-width: 0; padding: .1em .15em .3em; margin-left: -.15em; border-radius: 0; border: 0; background: none; color: var(--link); font: inherit; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .icon { min-width: 2.75rem; min-height: 2.75rem; font-size: 1.2rem; line-height: 1; padding: 0 .55rem; cursor: pointer; } /* a touch-sized target (the card's star) */

@@ -42,8 +42,9 @@ export function createBookList(store, limit = LIST_LIMIT) {
     clear() {
       store.write([]);
     },
-    toText() {
-      return read()
+    // `books`: the order to write them in (the list's own by default)
+    toText(books = read()) {
+      return books
         .map((e) => `${e.title} (${e.isbn})`)
         .join('\n');
     },

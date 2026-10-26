@@ -38,6 +38,13 @@ test('has, remove and clear', () => {
   assert.deepEqual(marked.list(), []);
 });
 
+test('toText writes the books in the order it is given', () => {
+  const marked = createBookList(memoryStore());
+  marked.add({ isbn: '1', title: 'B' });
+  marked.add({ isbn: '2', title: 'A' });
+  assert.equal(marked.toText(marked.list().reverse()), 'B (1)\nA (2)');
+});
+
 test('toText lists "Title (ISBN)" per line, newest first', () => {
   const marked = createBookList(memoryStore());
   marked.add(potter);

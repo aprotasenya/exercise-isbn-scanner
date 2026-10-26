@@ -11,6 +11,8 @@ export function createMeta(store, limit = 1000) {
   const keyed = createKeyed(store, isEntry, limit);
   return {
     get: keyed.get,
+    // isbn -> rating value, for the books that have one (the lists show it)
+    ratings: () => new Map(keyed.all().filter((e) => e.rating).map((e) => [e.isbn, e.rating.value])),
     set: (isbn, found) => keyed.put({ ...found, isbn, v: META_VERSION }),
   };
 }

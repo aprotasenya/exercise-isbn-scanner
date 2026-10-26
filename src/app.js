@@ -6,6 +6,7 @@ import { createListStore } from './storage.js';
 import { createBookList } from './bookList.js';
 import { createNames } from './names.js';
 import { createTitles } from './titles.js';
+import { loadSort, saveSort } from './sort.js';
 import { META_VERSION, createMeta } from './meta.js';
 import { factsBlock, ratingBlock } from './details.js';
 import { LOOKUP_URL, lookupBook } from './lookup.js';
@@ -89,6 +90,9 @@ const scannedView = createListView({
   onOpen: openBook,
   onChange: renderLists,
   isWaiting: (isbn) => pending.has(isbn),
+  ratings: meta.ratings,
+  sortMode: loadSort(browserStorage(), 'scanned'),
+  onSort: (mode) => saveSort(browserStorage(), 'scanned', mode),
   notify: (text, isError) => setStatus(text, isError, isError ? 0 : NOTE_MS),
   elements: listElements('scanned'),
 });
@@ -106,6 +110,9 @@ const markedView = createListView({
   onOpen: openBook,
   onChange: renderLists,
   isWaiting: (isbn) => pending.has(isbn),
+  ratings: meta.ratings,
+  sortMode: loadSort(browserStorage(), 'marked'),
+  onSort: (mode) => saveSort(browserStorage(), 'marked', mode),
   notify: (text, isError) => setStatus(text, isError, isError ? 0 : NOTE_MS),
   elements: listElements('marked'),
 });

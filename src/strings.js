@@ -53,6 +53,8 @@ export const t = {
     scanned: 'Очистіть список, щоб додавати далі.',
     marked: 'Приберіть кілька книг або очистіть список, щоб додавати далі.',
   },
+  sortMenu: 'Сортування',
+  sortNames: { date: 'За датою', name: 'За назвою (А–Я)', rating: 'За рейтингом' },
   clearScanned: (booksText) => `Очистити «${listNames.scanned}» (${booksText})? Вибране залишиться.`,
   clearMarked: (booksText) => `Очистити «${listNames.marked}» (${booksText})?`,
   copied: (booksText) => `Скопійовано ${booksText} до буфера.`,
