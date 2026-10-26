@@ -6,7 +6,8 @@
       "args": [
         "@playwright/mcp@0.0.83",
         "--browser",
-        "chromium"
+        "chromium",
+        "--headless"
       ],
       "env": {}
     }
