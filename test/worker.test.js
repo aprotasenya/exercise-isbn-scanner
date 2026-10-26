@@ -33,7 +33,7 @@ test('returns the book and allows the app origin', async () => {
   const response = await get(`?isbn=${ISBN}`);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('access-control-allow-origin'), ORIGIN);
-  assert.deepEqual(await response.json(), { title: 'Title', series: null, author: { name: 'A', url: 'https://www.goodreads.com/author/show/1.A' }, rating: { value: 4.5, count: 10 }, image: 'https://m.media-amazon.com/a.jpg', url: 'https://www.goodreads.com/book/show/1' });
+  assert.deepEqual(await response.json(), { title: 'Title', series: null, author: { name: 'A', url: 'https://www.goodreads.com/author/show/1.A' }, rating: { value: 4.5, count: 10 }, image: 'https://m.media-amazon.com/a.jpg' });
   assert.deepEqual(calls, [`https://www.goodreads.com/book/isbn/${ISBN}`]);
 });
 

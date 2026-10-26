@@ -1,6 +1,6 @@
 # Lookup service
 
-A tiny Cloudflare Worker: `GET /lookup?isbn=<isbn>` reads the Goodreads page for that ISBN and answers `{title, series: {name, number}, author: {name, url}, rating: {value, count}, image, url}` as JSON (the title has its trailing brackets cut off; the series is the bracket with a `#number`; the author is the first one listed; `series`, `author` and `rating` are `null` when the page has none), or `404 {}` when there is nothing. The app (`src/lookup.js`) uses it to name a book and show its cover. The app works fully without it.
+A tiny Cloudflare Worker: `GET /lookup?isbn=<isbn>` reads the Goodreads page for that ISBN and answers `{title, series: {name, number}, author: {name, url}, rating: {value, count}, image}` as JSON (the title has its trailing brackets cut off; the series is the bracket with a `#number`; the author is the first one listed; `series`, `author` and `rating` are `null` when the page has none), or `404 {}` when there is nothing. The app (`src/lookup.js`) uses it to name a book and show its cover. The app works fully without it.
 
 - Only `https://oleprota.github.io` and `http://localhost:8000` may call it from a browser (`ALLOWED_ORIGINS` in `index.js`).
 - The cache key carries a version (`v3` in `index.js`): change it whenever the answer's shape changes, so old cached answers are not served.

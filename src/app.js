@@ -2,8 +2,8 @@ import { isValidIsbn, normalizeIsbn } from './isbn.js';
 import { isbnLinks } from './links.js';
 import { startScanner } from './scanner.js';
 import { hashForIsbn, isbnFromHash } from './hash.js';
-import { createListStore, copyListOnce } from './storage.js';
-import { createBookList, isBookEntry } from './bookList.js';
+import { createListStore } from './storage.js';
+import { createBookList } from './bookList.js';
 import { createNames } from './names.js';
 import { createTitles } from './titles.js';
 import { META_VERSION, createMeta } from './meta.js';
@@ -33,14 +33,7 @@ function browserStorage() {
   }
 }
 
-// "Scanned" is everything searched or scanned (it used to be the "last 10" chips, key
-// isbn-reader.recent); "Marked" is the subset the user picked.
-copyListOnce(browserStorage(), 'isbn-reader.recent', 'isbn-reader.scanned', isBookEntry);
-try {
-  browserStorage()?.removeItem('isbn-reader.automark'); // the Auto-mark setting no longer exists
-} catch {
-  // blocked storage: nothing to clean up
-}
+// "Scanned" is everything searched or scanned; "Marked" is the subset the user picked.
 const scanned = createBookList(createListStore(browserStorage(), 'isbn-reader.scanned'));
 const marked = createBookList(createListStore(browserStorage(), 'isbn-reader.marked'));
 const names = createNames(createListStore(browserStorage(), 'isbn-reader.names'));

@@ -1,4 +1,4 @@
-// ISBN lookup service: GET /lookup?isbn=<isbn> -> {title, authors, image, url} or 404 {}.
+// ISBN lookup service: GET /lookup?isbn=<isbn> -> {title, series, author, rating, image} or 404 {}.
 // It reads the Goodreads page for the ISBN on behalf of the app (a browser page can't: no CORS
 // headers there). Runs as a Cloudflare Worker, see README.md in this folder.
 import { isValidIsbn, normalizeIsbn } from '../src/isbn.js';
@@ -47,7 +47,7 @@ async function fromGoodreads(isbn, fetchFn, wait) {
       miss = `status ${response.status}`;
       if (response.status === 200 && response.body) {
         const book = parseBook(await readHead(response));
-        if (book) return { book: { ...book, url: response.url } };
+        if (book) return { book };
         miss = 'no book data in page';
       }
       if (response.status !== 202) break;

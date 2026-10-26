@@ -19,16 +19,3 @@ export function createListStore(storage, key) {
     },
   };
 }
-
-// One-time migration: copies a list saved under an old key to a new key, unless the new key
-// already exists. Only entries accepted by `isValid` are copied; the old key stays.
-export function copyListOnce(storage, fromKey, toKey, isValid) {
-  try {
-    if (storage.getItem(toKey) !== null) return;
-    const list = JSON.parse(storage.getItem(fromKey));
-    if (!Array.isArray(list)) return;
-    storage.setItem(toKey, JSON.stringify(list.filter(isValid)));
-  } catch {
-    // missing, corrupt or blocked storage: nothing to migrate
-  }
-}
