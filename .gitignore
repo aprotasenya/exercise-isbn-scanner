@@ -37,3 +37,4 @@ node_modules/
 # Playwright MCP output (screenshots, snapshots, logs)
 .playwright-mcp/
 .wrangler/
+.dev.vars
