@@ -66,7 +66,7 @@ body:has(#isbn:focus) .scan-dock { display: none; }
 #scan > * { position: relative; }
 #scan.stop { background: var(--error); color: var(--on-accent); }
 #scanner { margin-top: 1rem; }
-#preview { display: block; width: 100%; max-height: 50vh; background: #000; border-radius: 12px; }
+#preview { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; max-height: 50vh; background: #000; border-radius: 12px; } /* a fixed shape from the start: without it the box is 150px high until the camera starts, then jumps */
 /* A brief shutter flash over the page when the camera reads a barcode (even if the scanner closes at once). */
 #snap { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: #ffb300; }
 #snap.flash { animation: snap .5s ease-out; }

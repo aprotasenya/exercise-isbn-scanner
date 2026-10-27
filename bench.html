@@ -5,17 +5,19 @@
 <title>Scanner bench</title>
 <style>
   body { font: 16px system-ui; margin: 1rem; max-width: 40rem }
-  video { width: 100%; background: #000; max-height: 40vh }
-  select, button { font: inherit; padding: .5rem }
+  video { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #000; max-height: 40vh }
+  select, button, input { font: inherit; padding: .5rem }
   pre { white-space: pre-wrap; font-size: 13px }
 </style>
 <h1>Scanner bench</h1>
-<p>Hold the same book at the same distance in the same light. Press Run, the run ends at the first book barcode (or after 15 s). Do 10 runs per config.</p>
+<p>Hold the same book at the same distance in the same light. Press Run, the run ends at the first book barcode (or after 15 s). Do 10 runs per config. The note (light, distance) splits the table into rows. Results stay after a reload.</p>
 <video id="v" playsinline muted></video>
 <p>
   <select id="cfg"></select>
+  <input id="note" placeholder="note: dim, 20 cm" size="14">
   <button id="run">Run</button>
   <button id="copy">Copy results</button>
+  <button id="clear">Clear</button>
 </p>
 <pre id="out"></pre>
 <script type="module" src="src/bench.js"></script>

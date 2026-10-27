@@ -20,6 +20,10 @@ export function createDedupe(ms, now = Date.now) {
   };
 }
 
+// The library tries a frame every 500 ms by default. Measured on a webcam (bench.html): 500 ms found a book in ~510 ms,
+// 100 ms in ~240 ms, but 100 ms felt too fast on a phone, so this is the middle.
+const SCAN_INTERVAL_MS = 250;
+
 let zxingLoaded;
 
 // The barcode library is large, so it is only fetched when scanning is first requested.
@@ -48,7 +52,7 @@ export function loadZxing() {
 // denied/unavailable.
 export async function startScanner(video, { onIsbn, onUnrecognized, onRepeat, continuous = false }) {
   const { BrowserMultiFormatOneDReader } = await loadZxing();
-  const reader = new BrowserMultiFormatOneDReader();
+  const reader = new BrowserMultiFormatOneDReader(undefined, { delayBetweenScanAttempts: SCAN_INTERVAL_MS });
   let done = false;
   const isDuplicate = createDedupe(3000);
   const controls = await reader.decodeFromVideoDevice(undefined, video, (result) => {
