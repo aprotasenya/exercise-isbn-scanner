@@ -25,3 +25,6 @@ namespace_id = "1002"
 binding = "DB"
 database_name = "isbn-stats"
 database_id = "46341b98-5fac-468c-816c-82cbf826549c"
+
+[observability]
+enabled = true
