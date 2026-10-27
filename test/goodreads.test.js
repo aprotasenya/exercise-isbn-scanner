@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseBook, parseCandidates, parseIsbn, splitTitle } from '../worker/goodreads.js';
+import { parseBook, parseCandidates, parseEdition, splitTitle } from '../worker/goodreads.js';
 
 const page = (...blocks) =>
   `<html><head>${blocks.map((b) => `<script type="application/ld+json">${typeof b === 'string' ? b : JSON.stringify(b)}</script>`).join('')}</head></html>`;
@@ -79,11 +79,13 @@ test('no Book block or no name is no data', () => {
   assert.equal(parseBook('<script type="application/ld+json">{"@type":"Book","name":"Cut off"'), null);
 });
 
-test('parseIsbn gives the edition\'s ISBN when it is valid, else null', () => {
-  assert.deepEqual(parseIsbn(page({ ...book, isbn: '978-617-129-941-2' })), { isbn: '9786171299412' });
-  assert.equal(parseIsbn(page({ ...book, isbn: '9786171299413' })), null);
-  assert.equal(parseIsbn(page(book)), null);
-  assert.equal(parseIsbn('<html></html>'), null);
+test('parseEdition is the book with the edition\'s ISBN when it is valid, else null', () => {
+  const edition = parseEdition(page({ ...book, isbn: '978-617-129-941-2' }));
+  assert.deepEqual(edition, { isbn: '9786171299412', ...parseBook(page(book)) });
+  assert.equal(parseEdition(page({ ...book, isbn: '9786171299413' })), null);
+  assert.equal(parseEdition(page(book)), null);
+  assert.equal(parseEdition(page({ ...book, name: '', isbn: '9786171299412' })), null);
+  assert.equal(parseEdition('<html></html>'), null);
 });
 
 test('parseCandidates keeps id and title, cleans the rest, and is null for a non-list', () => {

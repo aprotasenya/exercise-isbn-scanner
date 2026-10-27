@@ -143,10 +143,10 @@ test('/search answers are cached per query, ignoring case and spaces', async () 
 
 const edition = (isbn) => goodreads(`<script type="application/ld+json">${JSON.stringify({ '@type': 'Book', name: 'Хірург', isbn })}</script>`);
 
-test('/book answers the ISBN of that Goodreads edition', async () => {
+test('/book answers the ISBN of that Goodreads edition, with its details', async () => {
   const { request, calls } = setup(edition('9786171299412'));
   const response = await request('/book?id=32740697');
-  assert.deepEqual(await response.json(), { isbn: '9786171299412' });
+  assert.deepEqual(await response.json(), { isbn: '9786171299412', title: 'Хірург', series: null, author: null, rating: null, image: '' });
   assert.deepEqual(calls, ['https://www.goodreads.com/book/show/32740697']);
 });
 

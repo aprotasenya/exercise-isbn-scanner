@@ -5,7 +5,7 @@
 import { isValidIsbn, normalizeIsbn } from './isbn.js';
 
 export const LOOKUP_URL = 'https://isbn-lookup.oleprota.workers.dev'; // the deployed worker (worker/README.md); '' turns the lookup off
-const TIMEOUT_MS = 5000;
+const TIMEOUT_MS = 10000; // Goodreads pages sometimes take 4 s or more, and the worker may ask twice (an empty 202)
 const SEARCH_TIMEOUT_MS = 12000; // the worker may ask Goodreads up to 4 times in a row (it drops words while nothing is found)
 const SHAPE = 6; // the answer's shape, same as `v6` in worker/index.js: it keeps the browser's HTTP cache from serving an answer of an older shape
 const BUSY_WAIT_MS = 5000; // the worker answered 429 (too many lookups at once): the request waits and goes again
@@ -48,10 +48,11 @@ export function cleanResults(data) {
     .slice(0, 5);
 }
 
-// The ISBN of a Goodreads edition, or null.
-export function cleanIsbn(data) {
+// A Goodreads edition picked from a title search: { isbn, found } (`found` is what cleanAnswer makes of the
+// same answer, null when it has no title), or null when the ISBN is not valid.
+export function cleanEdition(data) {
   const isbn = normalizeIsbn(data?.isbn ?? '');
-  return isValidIsbn(isbn) ? isbn : null;
+  return isValidIsbn(isbn) ? { isbn, found: cleanAnswer(data) } : null;
 }
 
 // Asks the service and returns what `parse` makes of the answer, or null. Never throws. A 429 puts the
@@ -74,4 +75,4 @@ async function ask(path, params, parse, { url = LOOKUP_URL, fetchFn = fetch, tim
 export const lookupBook = (isbn, options) => ask('lookup', { isbn, v: SHAPE }, cleanAnswer, options);
 // null = the search failed; [] = it found nothing
 export const searchBooks = (query, options) => ask('search', { q: query }, cleanResults, { timeout: SEARCH_TIMEOUT_MS, ...options });
-export const isbnOfBook = (id, options) => ask('book', { id }, cleanIsbn, options);
+export const editionOfBook = (id, options) => ask('book', { id }, cleanEdition, options);

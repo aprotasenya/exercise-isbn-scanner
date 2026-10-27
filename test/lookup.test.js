@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanAnswer, isbnOfBook, lookupBook, searchBooks } from '../src/lookup.js';
+import { cleanAnswer, editionOfBook, lookupBook, searchBooks } from '../src/lookup.js';
 import { META_VERSION, createMeta } from '../src/meta.js';
 
 const URL_ = 'https://lookup.example';
@@ -77,10 +77,11 @@ test('a title search asks /search and cleans every candidate; a failure is null,
 
 test('the ISBN of a picked book is asked from /book and checked', async () => {
   let requested;
-  assert.equal(await isbnOfBook('32740697', { url: URL_, fetchFn: async (url) => { requested = url; return answer({ isbn: '978-617-129-941-2' })(); } }), '9786171299412');
+  assert.deepEqual(await editionOfBook('32740697', { url: URL_, fetchFn: async (url) => { requested = url; return answer({ isbn: '978-617-129-941-2', title: ' Хірург ', author: { name: 'Tess' }, rating: { value: 4.1, count: 3 } })(); } }), { isbn: '9786171299412', found: { title: 'Хірург', image: '', series: null, author: { name: 'Tess', url: '' }, rating: { value: 4.1, count: 3 } } });
+  assert.equal((await editionOfBook('1', { url: URL_, fetchFn: answer({ isbn: '9786171299412' }) })).found, null); // an ISBN without details
   assert.equal(requested, `${URL_}/book?id=32740697`);
-  for (const body of [{ isbn: '9786171299413' }, { isbn: 5 }, {}]) assert.equal(await isbnOfBook('1', { url: URL_, fetchFn: answer(body) }), null);
-  assert.equal(await isbnOfBook('1', { url: URL_, fetchFn: answer({}, 404) }), null);
+  for (const body of [{ isbn: '9786171299413', title: 'T' }, { isbn: 5 }, {}]) assert.equal(await editionOfBook('1', { url: URL_, fetchFn: answer(body) }), null);
+  assert.equal(await editionOfBook('1', { url: URL_, fetchFn: answer({}, 404) }), null);
 });
 
 test('gives up after the timeout', async () => {

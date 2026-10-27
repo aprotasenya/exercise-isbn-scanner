@@ -1,10 +1,10 @@
 // ISBN lookup service, for the app (a browser page can't read Goodreads: no CORS headers there):
 //   GET /lookup?isbn=<isbn>  -> {title, series, author, rating, image} or 404 {}
 //   GET /search?q=<title>    -> {results: [{id, title, author, image}]} (up to 5)
-//   GET /book?id=<book id>   -> {isbn} of that Goodreads edition, or 404 {}
+//   GET /book?id=<book id>   -> {isbn, title, series, author, rating, image} of that Goodreads edition, or 404 {}
 // Runs as a Cloudflare Worker, see README.md in this folder.
 import { isValidIsbn, normalizeIsbn } from '../src/isbn.js';
-import { parseBook, parseCandidates, parseIsbn } from './goodreads.js';
+import { parseBook, parseCandidates, parseEdition } from './goodreads.js';
 
 export const ALLOWED_ORIGINS = ['https://oleprota.github.io', 'http://localhost:8000'];
 const FOUND_SECONDS = 7 * 24 * 3600;
@@ -119,8 +119,8 @@ export function createHandler({ fetchFn, cache, wait = (ms) => new Promise((reso
     } else if (url.pathname === '/book') {
       const id = param('id');
       if (!/^\d{1,12}$/.test(id)) return json({ error: 'invalid id' }, 400, 0, cors);
-      key = `book1/${id}`;
-      work = () => pageAnswer(`https://www.goodreads.com/book/show/${id}`, parseIsbn);
+      key = `book2/${id}`; // book2: the whole answer with the ISBN, not the ISBN alone
+      work = () => pageAnswer(`https://www.goodreads.com/book/show/${id}`, parseEdition);
     } else if (url.pathname === '/search') {
       const query = param('q').slice(0, 100);
       if (query.length < 2) return json({ error: 'query too short' }, 400, 0, cors);

@@ -73,12 +73,6 @@ const findBook = (html) =>
     .flatMap((block) => (Array.isArray(block) ? block : [block]))
     .find((block) => block?.['@type'] === 'Book');
 
-// `{ isbn }`: the ISBN of the edition the page is about (when it has a valid one), or null.
-export function parseIsbn(html) {
-  const isbn = normalizeIsbn(findBook(html)?.isbn ?? '');
-  return isValidIsbn(isbn) ? { isbn } : null;
-}
-
 // The books in Goodreads' search-as-you-type answer (an array): up to 5 of
 // `{ id, title, author, image }`. Entries without an id or a title are dropped.
 export function parseCandidates(data) {
@@ -94,9 +88,8 @@ export function parseCandidates(data) {
     .slice(0, 5);
 }
 
-// `{ title, series, author, rating, image }` for the first Book in the page, or null (no title = no data).
-export function parseBook(html) {
-  const book = findBook(html);
+// What the answer holds, from the page's Book block (null = no title, no data).
+function readBook(book) {
   const name = text(book?.name, 200);
   if (!name) return null;
   const { title, series } = splitTitle(name);
@@ -107,4 +100,16 @@ export function parseBook(html) {
     rating: ratingOf(book.aggregateRating),
     image: typeof book.image === 'string' && book.image.startsWith('https://') ? book.image : '',
   };
+}
+
+// `{ title, series, author, rating, image }` for the first Book in the page, or null (no title = no data).
+export const parseBook = (html) => readBook(findBook(html));
+
+// `{ isbn, title, series, author, rating, image }`: the Book of the page with the ISBN of its edition, or null
+// when the page has no valid ISBN. A picked search result is fully described by this one page.
+export function parseEdition(html) {
+  const book = findBook(html);
+  const isbn = normalizeIsbn(book?.isbn ?? '');
+  const details = readBook(book);
+  return details && isValidIsbn(isbn) ? { isbn, ...details } : null;
 }

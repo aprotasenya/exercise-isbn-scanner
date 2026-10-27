@@ -10,7 +10,7 @@ import { createTitles } from './titles.js';
 import { loadSort, saveSort } from './sort.js';
 import { META_VERSION, createMeta } from './meta.js';
 import { factsBlock, ratingBlock } from './details.js';
-import { LOOKUP_URL, isbnOfBook, lookupBook, searchBooks } from './lookup.js';
+import { LOOKUP_URL, editionOfBook, lookupBook, searchBooks } from './lookup.js';
 import { createListView, createMarkToggle, iconButton } from './listView.js';
 import { el, linkButton, spinner } from './dom.js';
 import { applyTheme, loadTheme, nextTheme, saveTheme } from './theme.js';
@@ -141,7 +141,7 @@ input.addEventListener('input', () => {
 
 // How a book is named: see src/titles.js. Renaming updates the stored titles too, so clearing a
 // typed name falls back to the found title (requestMeta).
-const titles = createTitles({ names, meta, lists: [scanned, marked] });
+const titles = createTitles({ names, meta, lists: [scanned, marked], foundBy });
 const fallbackTitle = titles.fallback;
 const bookFor = (isbn) => ({ title: titles.of(isbn) });
 
@@ -593,11 +593,12 @@ function candidateList(found, token) {
     pick.append(text);
     pick.addEventListener('click', async () => {
       setStatus(t.gettingIsbn);
-      const isbn = await isbnOfBook(book.id);
+      const edition = await editionOfBook(book.id);
       if (token !== pickToken) return;
-      if (!isbn) return setStatus(t.noIsbn(book.title), true);
-      input.value = isbn;
-      search(isbn, { found: book });
+      if (!edition) return setStatus(t.noIsbn(book.title), true);
+      if (edition.found) meta.set(edition.isbn, edition.found); // the page already told everything: no second lookup
+      input.value = edition.isbn;
+      search(edition.isbn, { found: book });
     });
     const item = el('li');
     item.append(pick);
