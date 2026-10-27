@@ -25,7 +25,7 @@ const button = form.querySelector('button[type="submit"]');
 const scanButton = document.getElementById('scan');
 const scanLabel = document.getElementById('scan-label');
 const scanner = document.getElementById('scanner');
-const preview = document.getElementById('preview');
+let preview = document.getElementById('preview');
 const themeButton = document.getElementById('theme');
 
 function browserStorage() {
@@ -510,6 +510,10 @@ async function openScanner(continuous = false) {
   input.value = '';
   result.replaceChildren();
   setStatus('');
+  // a new <video> for every start: an iPhone kept showing a later start's picture unfitted to the box when the element was reused
+  const fresh = preview.cloneNode(false);
+  preview.replaceWith(fresh);
+  preview = fresh;
   try {
     const stop = await startScanner(preview, {
       onIsbn(isbn) {

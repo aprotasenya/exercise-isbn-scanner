@@ -22,7 +22,7 @@ const CONFIGS = {
 };
 
 const $ = (id) => document.getElementById(id);
-const video = $('v');
+let video = $('v');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const timeout = (ms, message) => sleep(ms).then(() => { throw new Error(message); });
 
@@ -78,6 +78,9 @@ function closeCamera(stream) {
 const median = (xs) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.floor((xs.length - 1) / 2)] : '-');
 
 async function run(name, note, hold) {
+  const fresh = video.cloneNode(false); // a new <video> for every run, as in the app (src/app.js openScanner)
+  video.replaceWith(fresh);
+  video = fresh;
   const config = hold ? { ...CONFIGS[name], delay: 0 } : CONFIGS[name]; // hold: no pause between frames, to see what the decoder can do
   const row = { name, note, hold, ok: false };
   let stream;
