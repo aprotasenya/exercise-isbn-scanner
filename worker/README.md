@@ -1,6 +1,6 @@
 # Lookup service
 
-A tiny Cloudflare Worker with three paths. `GET /search?q=<title>` answers `{results: [{id, title, author, image}]}` (up to 5, which is Goodreads' own cap, from its search-as-you-type JSON; when nothing matches, the last word is dropped and it is asked again, up to 4 tries, so an author word Goodreads doesn't know doesn't empty the list; cached 1 day, or 5 minutes when empty; 502 when Goodreads fails). `GET /book?id=<Goodreads book id>` answers `{isbn, title, series, author, rating, image}` of that edition (the same details as `/lookup`, so a picked result needs no second page fetch), or `404 {}` when it has no valid one. `GET /lookup?isbn=<isbn>` reads the Goodreads page for that ISBN and answers `{title, series: {name, number}, author: {name, url}, rating: {value, count}, image}` as JSON (the title has its trailing brackets cut off; the series is the bracket with a `#number`; the author is the first one listed; `series`, `author` and `rating` are `null` when the page has none), or `404 {}` when there is nothing. The app (`src/lookup.js`) uses it to name a book and show its cover. The app works fully without it.
+A tiny Cloudflare Worker with three read paths and one for usage stats (`POST /event`, below). `GET /search?q=<title>` answers `{results: [{id, title, author, image}]}` (up to 5, which is Goodreads' own cap, from its search-as-you-type JSON; when nothing matches, the last word is dropped and it is asked again, up to 4 tries, so an author word Goodreads doesn't know doesn't empty the list; cached 1 day, or 5 minutes when empty; 502 when Goodreads fails). `GET /book?id=<Goodreads book id>` answers `{isbn, title, series, author, rating, image}` of that edition (the same details as `/lookup`, so a picked result needs no second page fetch), or `404 {}` when it has no valid one. `GET /lookup?isbn=<isbn>` reads the Goodreads page for that ISBN and answers `{title, series: {name, number}, author: {name, url}, rating: {value, count}, image}` as JSON (the title has its trailing brackets cut off; the series is the bracket with a `#number`; the author is the first one listed; `series`, `author` and `rating` are `null` when the page has none), or `404 {}` when there is nothing. The app (`src/lookup.js`) uses it to name a book and show its cover. The app works fully without it.
 
 - Only `https://oleprota.github.io` and `http://localhost:8000` may call it from a browser (`ALLOWED_ORIGINS` in `index.js`).
 - The cache key carries a version (`v6` in `index.js`): change it whenever the answer's shape changes, so old cached answers are not served.
@@ -8,6 +8,22 @@ A tiny Cloudflare Worker with three paths. `GET /search?q=<title>` answers `{res
 - New (uncached) lookups are limited to 20 per 10 seconds per address (`wrangler.toml`). Past that the answer is 429, and the app waits 5 s and asks again (up to 3 times).
 - Free plan: 100,000 requests a day, 10 ms CPU each. Past the limit requests fail (the app then just shows `ISBN <number>`); nothing is billed unless you upgrade to a paid plan.
 - Where it is deployed: https://isbn-lookup.oleprota.workers.dev (Cloudflare account of oleprota@gmail.com, worker `isbn-lookup`; first deployed 2026-10-26).
+
+## Usage stats (optional)
+
+`POST /event` takes a batch of anonymous usage events from the app (`src/stats.js`) and keeps them in a D1 database (Cloudflare's free SQLite). Which events and fields are allowed is in `events.js`; anything else is dropped, and a body over 4 KB or an address past 30 batches a minute (`EVENT_LIMITER`) is refused. Without the database the endpoint answers 204 and drops the events, so nothing else depends on it. Set it up once:
+
+    cd worker
+    npx wrangler d1 create isbn-stats          # prints a database_id
+    # uncomment [[d1_databases]] in wrangler.toml and paste the id
+    npx wrangler d1 execute isbn-stats --remote --file=schema.sql
+    npx wrangler deploy
+
+Read it (every row has `dev`: 1 is the developer's own use, leave it out):
+
+    npx wrangler d1 execute isbn-stats --remote --command "SELECT json_extract(data,'$.os') os, json_extract(data,'$.browser') browser, COUNT(DISTINCT id) users FROM events WHERE name='session' AND dev=0 GROUP BY 1,2"
+    npx wrangler d1 execute isbn-stats --remote --command "SELECT json_extract(data,'$.result') result, COUNT(*) n, CAST(AVG(json_extract(data,'$.ms')) AS INT) avg_ms FROM events WHERE name='lookup' AND dev=0 GROUP BY 1"
+    npx wrangler d1 execute isbn-stats --remote --command "DELETE FROM events WHERE ts < (strftime('%s','now') - 90*86400) * 1000"   # drop rows older than 90 days
 
 ## Deploy (once)
 

@@ -28,6 +28,7 @@ export const t = {
   // the title of a book that has no name (also stored with the lists, so keep it stable)
   isbnTitle: (isbn) => `ISBN ${isbn}`,
   themeAria: (theme) => `Тема: ${THEME_NAMES[theme]}. Натисніть, щоб змінити.`,
+  statsNote: (id, dev) => `Анонімна статистика (не про вас чи книжки) · ваш ID: ${id}${dev ? ' · dev' : ''}`,
   scan: 'Сканувати',
   stop: 'Стоп',
   invalidIsbn: 'Введіть дійсний ISBN-10 або ISBN-13.',

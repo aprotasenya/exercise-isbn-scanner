@@ -10,3 +10,18 @@ namespace_id = "1001"
   [ratelimits.simple]
   limit = 20
   period = 10
+
+# At most 30 usage-event batches per minute from one address.
+[[ratelimits]]
+name = "EVENT_LIMITER"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60
+
+# Usage events are kept in D1 (see README.md for the three commands that make it); without it POST /event just drops them.
+[[d1_databases]]
+binding = "DB"
+database_name = "isbn-stats"
+database_id = "46341b98-5fac-468c-816c-82cbf826549c"

@@ -3,6 +3,7 @@ import { isbnLinks } from './links.js';
 import { startScanner } from './scanner.js';
 import { hashForIsbn, isbnFromHash } from './hash.js';
 import { createListStore } from './storage.js';
+import { bucket, createStats, describeClient } from './stats.js';
 import { createBookList } from './bookList.js';
 import { createNames } from './names.js';
 import { createFoundBy } from './foundBy.js';
@@ -35,6 +36,21 @@ function browserStorage() {
   }
 }
 
+// Anonymous usage counts (src/stats.js): #dev / #nodev (the developer flag) is read from the address and then removed from it.
+const stats = createStats({
+  url: LOOKUP_URL,
+  storage: browserStorage(),
+  hash: location.hash,
+  hostname: location.hostname,
+  doNotTrack: navigator.doNotTrack === '1',
+});
+if (/^#(no)?dev$/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
+document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && stats.flush());
+window.addEventListener('pagehide', stats.flush);
+const statsNote = document.getElementById('stats-note');
+statsNote.textContent = t.statsNote(stats.id, stats.dev);
+statsNote.hidden = !stats.enabled;
+
 // "Scanned" is everything searched or scanned; "Marked" is the subset the user picked.
 const scanned = createBookList(createListStore(browserStorage(), 'isbn-reader.scanned'));
 const marked = createBookList(createListStore(browserStorage(), 'isbn-reader.marked'));
@@ -63,7 +79,7 @@ function clearWarning() {
 
 const openBook = (isbn) => {
   input.value = isbn;
-  search(isbn, { move: false });
+  search(isbn, { move: false, via: 'list' });
 };
 const listElements = (id) => ({
   section: document.getElementById(id),
@@ -85,6 +101,7 @@ const markToggle = createMarkToggle({
   marked,
   onChange: renderLists,
   onFull: () => warnFull('marked', marked),
+  onToggle: (on) => stats.track('star', { on: on ? 1 : 0 }),
 });
 const scannedView = createListView({
   list: scanned,
@@ -96,7 +113,11 @@ const scannedView = createListView({
   ratings: meta.ratings,
   foundBy: foundBy.all,
   sortMode: loadSort(browserStorage(), 'scanned'),
-  onSort: (mode) => saveSort(browserStorage(), 'scanned', mode),
+  onSort: (mode) => {
+    saveSort(browserStorage(), 'scanned', mode);
+    stats.track('sort', { list: 'scanned', mode });
+  },
+  onCopy: (ok) => stats.track('copy', { list: 'scanned', ok: ok ? 1 : 0 }),
   notify: (text, isError) => setStatus(text, isError, isError ? 0 : NOTE_MS),
   elements: listElements('scanned'),
 });
@@ -107,6 +128,7 @@ const markedView = createListView({
     const remove = iconButton('✕', t.unmark);
     remove.addEventListener('click', () => {
       marked.remove(book.isbn);
+      stats.track('star', { on: 0 });
       renderLists();
     });
     return remove;
@@ -117,7 +139,11 @@ const markedView = createListView({
   ratings: meta.ratings,
   foundBy: foundBy.all,
   sortMode: loadSort(browserStorage(), 'marked'),
-  onSort: (mode) => saveSort(browserStorage(), 'marked', mode),
+  onSort: (mode) => {
+    saveSort(browserStorage(), 'marked', mode);
+    stats.track('sort', { list: 'marked', mode });
+  },
+  onCopy: (ok) => stats.track('copy', { list: 'marked', ok: ok ? 1 : 0 }),
   notify: (text, isError) => setStatus(text, isError, isError ? 0 : NOTE_MS),
   elements: listElements('marked'),
 });
@@ -172,6 +198,7 @@ function titleHeading(book, isbn, waiting) {
   function save(raw, initial) {
     const value = raw.trim().replace(/\s+/g, ' ');
     if (value === initial) return; // unchanged: this also keeps titles saved by earlier versions
+    stats.track('title_edit', { cleared: value ? 0 : 1 });
     const name = value.slice(0, 120) === fallbackTitle(isbn) ? '' : value;
     const title = names.set(isbn, name) || fallbackTitle(isbn);
     if (title === book.title) return; // e.g. an empty name on a card that already shows the default
@@ -269,7 +296,7 @@ function requestMeta(isbn) {
   asked.add(isbn);
   pending.add(isbn);
   renderLists(); // the rows of this book show the spinner too (several lookups can run at once while scanning)
-  lookupBook(isbn).then((found) => {
+  lookupBook(isbn, { report: (result, ms) => stats.track('lookup', { result, ms }) }).then((found) => {
     pending.delete(isbn);
     if (found) return applyMeta(isbn, found);
     if (shownCard(isbn)) shown.setWaiting(false);
@@ -300,6 +327,7 @@ function applyMeta(isbn, found) {
 // open cancel that pending start.
 let stopCamera = null;
 let scanToken = 0;
+let scanStats = null; // { opened, found } of the scan on screen, for the usage stats
 
 // The field and Search are locked while the camera is on; the Scan button
 // turns into Stop (the way out of a scan).
@@ -473,6 +501,9 @@ async function openScanner(continuous = false) {
   if (!scanner.hidden) return;
   prepareAudio(); // still inside the tap, which is what lets sound play later
   const token = ++scanToken;
+  const mode = continuous ? 'series' : 'one';
+  scanStats = { opened: Date.now(), found: 0 };
+  stats.track('scan_start', { mode });
   scanner.hidden = false;
   updateControls();
   // Start from a clean slate: no previous ISBN, book card or message.
@@ -485,11 +516,13 @@ async function openScanner(continuous = false) {
         // high = a new book, low = already scanned, lowest = list full (not added)
         const again = scanned.has(isbn);
         const full = !again && scanned.isFull();
+        scanStats.found++;
+        stats.track('scan_ok', { mode, ms: Date.now() - scanStats.opened });
         confirmScan(full ? BEEP_FULL : again ? BEEP_AGAIN : BEEP_NEW);
         if (continuous) return addScanned(isbn);
         closeScanner();
         input.value = isbn;
-        search(isbn);
+        search(isbn, { via: 'scan' });
         if (again) setStatus(t.alreadyScanned(bookFor(isbn).title));
       },
       onUnrecognized: showNotBookHint,
@@ -501,6 +534,7 @@ async function openScanner(continuous = false) {
   } catch (err) {
     console.error('Could not start the scanner:', err);
     if (token !== scanToken) return;
+    stats.track('scan_fail', { reason: { NotAllowedError: 'denied', SecurityError: 'denied', NotFoundError: 'no_camera', NotReadableError: 'busy' }[err?.name] ?? 'other' });
     closeScanner();
     setStatus(t.cameraUnavailable, true);
     input.focus();
@@ -549,6 +583,7 @@ scanButton.addEventListener('contextmenu', (event) => event.preventDefault());
 scanButton.addEventListener('click', () => {
   if (swallowClick) return;
   if (scanner.hidden) return openScanner();
+  stats.track('scan_stop', { ms: Date.now() - scanStats.opened, found: scanStats.found });
   closeScanner();
   setStatus('');
 });
@@ -575,6 +610,7 @@ async function searchTitle(text) {
   setStatus(t.searchingTitle);
   const found = await searchBooks(text);
   if (token !== pickToken) return;
+  stats.track('title_search', { n: found ? found.length : -1 });
   if (!found) return setStatus(t.searchFailed, true);
   if (!found.length) return setStatus(t.noTitleResults, true);
   setStatus(t.pickBook);
@@ -595,10 +631,11 @@ function candidateList(found, token) {
       setStatus(t.gettingIsbn);
       const edition = await editionOfBook(book.id);
       if (token !== pickToken) return;
+      stats.track('title_pick', { isbn: edition ? 1 : 0, details: edition?.found ? 1 : 0 });
       if (!edition) return setStatus(t.noIsbn(book.title), true);
       if (edition.found) meta.set(edition.isbn, edition.found); // the page already told everything: no second lookup
       input.value = edition.isbn;
-      search(edition.isbn, { found: book });
+      search(edition.isbn, { found: book, via: 'title' });
     });
     const item = el('li');
     item.append(pick);
@@ -610,10 +647,11 @@ function candidateList(found, token) {
 // `push: false` is used when the search comes from the URL itself (load, Back/Forward);
 // those don't add a history entry. A valid search drops the focus from the field, so the phone keyboard closes.
 // `move: false`: the book is only shown again, so it keeps its place in the Scanned list.
-function search(isbn, { push = true, move = true, found = null } = {}) {
+function search(isbn, { push = true, move = true, found = null, via = 'typed' } = {}) {
   pickToken++;
   closeScanner();
   result.replaceChildren();
+  stats.track('search', { via, ok: isValidIsbn(isbn) ? 1 : 0 });
   if (!isValidIsbn(isbn)) return setStatus(t.invalidIsbn, true);
   if (move) foundBy.set(isbn, found?.title, found?.author); // a search by ISBN clears the title a book was once found by
   if (push && isbnFromHash(location.hash) !== isbn) history.pushState(null, '', hashForIsbn(isbn));
@@ -631,7 +669,7 @@ window.addEventListener('popstate', () => {
   const isbn = isbnFromHash(location.hash);
   if (isbn) {
     input.value = isbn;
-    search(isbn, { push: false, move: false });
+    search(isbn, { push: false, move: false, via: 'history' });
   } else {
     pickToken++;
     closeScanner();
@@ -656,10 +694,20 @@ themeButton.addEventListener('click', () => {
 });
 showTheme();
 
+stats.track('session', {
+  ...describeClient(navigator.userAgent, navigator.maxTouchPoints),
+  standalone: matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 1 : 0,
+  theme,
+  screen: innerWidth < 600 ? 'phone' : innerWidth < 1024 ? 'tablet' : 'desktop',
+  native_scan: 'BarcodeDetector' in window ? 1 : 0,
+  scanned: bucket(scanned.list().length),
+  marked: bucket(marked.list().length),
+});
+
 renderLists();
 updateControls();
 const linkedIsbn = isbnFromHash(location.hash);
 if (linkedIsbn) {
   input.value = linkedIsbn;
-  search(linkedIsbn, { push: false, move: false });
+  search(linkedIsbn, { push: false, move: false, via: 'link' });
 }

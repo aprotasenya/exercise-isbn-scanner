@@ -57,19 +57,29 @@ export function cleanEdition(data) {
 
 // Asks the service and returns what `parse` makes of the answer, or null. Never throws. A 429 puts the
 // request in a queue of sorts: it waits and asks again (up to BUSY_RETRIES times), so the caller's
-// spinner runs until the final answer.
-async function ask(path, params, parse, { url = LOOKUP_URL, fetchFn = fetch, timeout = TIMEOUT_MS, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+// spinner runs until the final answer. `report(outcome, ms)` (optional, for the usage stats) is told how it ended:
+// found, invalid (an answer that is not usable), missing (404), busy (429 to the end), timeout, offline or error.
+async function ask(path, params, parse, { url = LOOKUP_URL, fetchFn = fetch, timeout = TIMEOUT_MS, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), report } = {}) {
   if (!url) return null;
+  const started = Date.now();
+  const done = (outcome, value = null) => {
+    report?.(outcome, Date.now() - started);
+    return value;
+  };
   for (let attempt = 0; attempt <= BUSY_RETRIES; attempt++) {
     try {
       const response = await fetchFn(`${url}/${path}?${new URLSearchParams(params)}`, { signal: AbortSignal.timeout(timeout) });
-      if (response.status !== 429) return response.ok ? parse(await response.json()) : null;
-    } catch {
-      return null;
+      if (response.status !== 429) {
+        if (!response.ok) return done(response.status === 404 ? 'missing' : 'error');
+        const value = parse(await response.json());
+        return done(value ? 'found' : 'invalid', value);
+      }
+    } catch (error) {
+      return done(error?.name === 'TimeoutError' ? 'timeout' : error instanceof TypeError ? 'offline' : 'error');
     }
     await wait(BUSY_WAIT_MS);
   }
-  return null;
+  return done('busy');
 }
 
 export const lookupBook = (isbn, options) => ask('lookup', { isbn, v: SHAPE }, cleanAnswer, options);

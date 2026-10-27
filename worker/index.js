@@ -2,9 +2,11 @@
 //   GET /lookup?isbn=<isbn>  -> {title, series, author, rating, image} or 404 {}
 //   GET /search?q=<title>    -> {results: [{id, title, author, image}]} (up to 5)
 //   GET /book?id=<book id>   -> {isbn, title, series, author, rating, image} of that Goodreads edition, or 404 {}
+//   POST /event              -> 204; a batch of anonymous usage events, kept in D1 when it is set up (events.js)
 // Runs as a Cloudflare Worker, see README.md in this folder.
 import { isValidIsbn, normalizeIsbn } from '../src/isbn.js';
 import { parseBook, parseCandidates, parseEdition } from './goodreads.js';
+import { MAX_BYTES as MAX_EVENT_BYTES, cleanBatch, saveBatch } from './events.js';
 
 export const ALLOWED_ORIGINS = ['https://oleprota.github.io', 'http://localhost:8000'];
 const FOUND_SECONDS = 7 * 24 * 3600;
@@ -96,15 +98,31 @@ const json = (body, status, seconds, extra = {}) =>
     headers: { 'content-type': 'application/json', 'cache-control': `public, max-age=${seconds}`, ...extra },
   });
 
+// Usage events: dropped silently without a database (DB is optional, like the limiter), saved after the answer is sent.
+async function record(request, env, ctx, cors) {
+  if (request.method !== 'POST') return json({}, 404, 0, cors);
+  if (Number(request.headers.get('content-length')) > MAX_EVENT_BYTES) return json({ error: 'too big' }, 413, 0, cors);
+  const limited = await env.EVENT_LIMITER?.limit({ key: request.headers.get('cf-connecting-ip') ?? 'anonymous' });
+  if (limited && !limited.success) return json({ error: 'slow down' }, 429, 0, cors);
+  const batch = cleanBatch(await request.text());
+  if (!batch) return json({ error: 'invalid' }, 400, 0, cors);
+  if (env.DB && batch.rows.length) {
+    const saving = saveBatch(env.DB, batch).catch(() => {}); // a failed save loses a few counters, nothing else
+    ctx?.waitUntil(saving);
+  }
+  return new Response(null, { status: 204, headers: cors });
+}
+
 // `fetchFn` and `cache` are parameters so that tests don't touch the network.
 export function createHandler({ fetchFn, cache, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }) {
-  return async function handle(request, env = {}) {
+  return async function handle(request, env = {}, ctx) {
     const origin = request.headers.get('origin');
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return new Response('Forbidden', { status: 403 });
     const cors = origin ? { 'access-control-allow-origin': origin, vary: 'Origin' } : {};
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...cors, 'access-control-allow-methods': 'GET' } });
 
     const url = new URL(request.url);
+    if (url.pathname === '/event') return record(request, env, ctx, cors);
     if (request.method !== 'GET') return json({}, 404, 0, cors);
     const param = (name) => (url.searchParams.get(name) ?? '').trim().replace(/\s+/g, ' ');
     // what each path asks: its cache key (the version changes with the answer's shape, or when old cached answers must go)
@@ -154,6 +172,6 @@ export function createHandler({ fetchFn, cache, wait = (ms) => new Promise((reso
 export default {
   fetch: (request, env, ctx) => {
     const handle = createHandler({ fetchFn: fetch, cache: caches.default });
-    return handle(request, env);
+    return handle(request, env, ctx);
   },
 };

@@ -127,6 +127,7 @@ body:has(#scanner:not([hidden])) #status:empty { display: block; }
 .candidate-author:empty { display: none; }
 .warning { margin: 1rem 0 0; padding: .6rem .8rem; border-radius: 8px; border: 1px solid var(--error); color: var(--error); background: var(--card); }
 .meta { color: var(--muted); margin: .25rem 0; }
+.footer { margin-top: 2rem; font-size: .8rem; text-align: center; }
 /* The lookup buttons under the name: the site icon at twice its 32px size, the name beneath. */
 .link-row { display: flex; justify-content: center; gap: 1rem; margin-top: 1rem; }
 .link-button { box-sizing: border-box; width: 88px; height: 88px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; color: var(--fg); text-decoration: none; font-size: .75rem; line-height: 1; transition: border-color .15s; }

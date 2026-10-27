@@ -14,7 +14,7 @@ export function iconButton(icon, label) {
 
 // The star on a card or list row: marks or unmarks a book in the Marked list. It keeps one
 // name ("Mark") and exposes its state, instead of renaming itself.
-export function createMarkToggle({ marked, onChange, onFull }) {
+export function createMarkToggle({ marked, onChange, onFull, onToggle = () => {} }) {
   function sync(button) {
     const isMarked = marked.has(button.dataset.isbn);
     button.textContent = isMarked ? '★' : '☆';
@@ -28,8 +28,11 @@ export function createMarkToggle({ marked, onChange, onFull }) {
       button.classList.add('mark-toggle');
       button.dataset.isbn = isbn;
       button.addEventListener('click', () => {
-        if (marked.has(isbn)) marked.remove(isbn);
-        else if (!marked.add({ isbn, title: book.title })) onFull(); // the list is full
+        if (marked.has(isbn)) {
+          marked.remove(isbn);
+          onToggle(false);
+        } else if (marked.add({ isbn, title: book.title })) onToggle(true);
+        else onFull(); // the list is full
         onChange();
       });
       sync(button);
@@ -59,10 +62,10 @@ function ratingTag(value) {
 //   order (see src/sort.js) and what to do when the user picks another one;
 //   foundBy(): Map of isbn -> { title, author } for the books found by a title search (their site links search for them, not the ISBN);
 //   isWaiting(isbn): true while the book's name is still being looked up (the row shows a spinner);
-//   notify(text, isError): status line; elements: { section, count, items, empty, copy, clear }
+//   onCopy(ok): the Copy button was used (for the usage stats); notify(text, isError): status line; elements: { section, count, items, empty, copy, clear }
 // The section (a <details>) opens by itself when the list stops being empty (on load, or at the
 // first book added, also while scanning); after that the user's open/closed choice is left alone.
-export function createListView({ list, confirmClear, rowButton, onOpen, onChange, isWaiting = () => false, ratings = () => new Map(), foundBy = () => new Map(), sortMode = 'date', onSort = () => {}, notify, elements }) {
+export function createListView({ list, confirmClear, rowButton, onOpen, onChange, isWaiting = () => false, ratings = () => new Map(), foundBy = () => new Map(), sortMode = 'date', onSort = () => {}, onCopy = () => {}, notify, elements }) {
   const { section, count, items, empty, copy, clear } = elements;
   let locked = false;
   let wasEmpty = true;
@@ -160,8 +163,10 @@ export function createListView({ list, confirmClear, rowButton, onOpen, onChange
     try {
       await navigator.clipboard.writeText(list.toText(ordered(list.list())));
       notify(t.copied(books(list.list().length)));
+      onCopy(true);
     } catch {
       notify(t.copyFailed, true);
+      onCopy(false);
     }
   });
 

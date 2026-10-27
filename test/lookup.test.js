@@ -115,3 +115,18 @@ test('meta ignores corrupt stored entries', () => {
   assert.equal(meta.get('9').title, 'Ok');
   assert.doesNotThrow(() => meta.set('8', { title: 'New' }));
 });
+
+test('report tells how a request ended', async () => {
+  const outcome = async (fetchFn, parse = lookupBook) => {
+    const seen = [];
+    await parse('9786171299412', { url: URL_, fetchFn, wait: async () => {}, report: (result, ms) => seen.push([result, typeof ms]) });
+    return seen;
+  };
+  assert.deepEqual(await outcome(async () => new Response(JSON.stringify({ title: 'T' }))), [['found', 'number']]);
+  assert.deepEqual(await outcome(async () => new Response(JSON.stringify({}))), [['invalid', 'number']]);
+  assert.deepEqual(await outcome(async () => new Response('{}', { status: 404 })), [['missing', 'number']]);
+  assert.deepEqual(await outcome(async () => new Response('{}', { status: 502 })), [['error', 'number']]);
+  assert.deepEqual(await outcome(async () => new Response('{}', { status: 429 })), [['busy', 'number']]);
+  assert.deepEqual(await outcome(async () => { throw new TypeError('Failed to fetch'); }), [['offline', 'number']]);
+  assert.deepEqual(await outcome(async () => { throw new DOMException('slow', 'TimeoutError'); }), [['timeout', 'number']]);
+});
