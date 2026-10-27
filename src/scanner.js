@@ -50,30 +50,6 @@ export function loadZxing() {
   return zxingLoaded;
 }
 
-// An iPhone shows the first frames of a camera stream at the wrong size and place (first the picture as it comes from the
-// sensor, then fitted to the box, sometimes shifted once more), so it looks as if it jumps. The video stays invisible
-// (no `live` class, see style.css) until the picture has stopped changing for `settle` ms after it started playing:
-// `playing` and `resize` (the picture's size changed) each restart the wait. Returns a function that cancels it.
-export function revealWhenSteady(video, settle = 300, onReveal = () => {}) {
-  video.classList.remove('live');
-  let timer = null;
-  const wait = () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      stop();
-      video.classList.add('live');
-      onReveal();
-    }, settle);
-  };
-  const events = ['playing', 'resize'];
-  for (const event of events) video.addEventListener(event, wait);
-  function stop() {
-    clearTimeout(timer);
-    for (const event of events) video.removeEventListener(event, wait);
-  }
-  return stop;
-}
-
 // Starts the camera in `video` and resolves to a function that stops it.
 // By default the first book ISBN ends the scan; with `continuous`, `onIsbn` keeps firing
 // for each newly seen book and `onRepeat` for every further sighting of a book still in view. Rejects if the library cannot load or the camera is
@@ -83,31 +59,22 @@ export async function startScanner(video, { onIsbn, onUnrecognized, onRepeat, co
   const reader = new BrowserMultiFormatOneDReader(undefined, { delayBetweenScanAttempts: SCAN_INTERVAL_MS });
   let done = false;
   const isDuplicate = createDedupe(3000);
-  const stopWaiting = revealWhenSteady(video);
-  let controls;
-  try {
-    controls = await reader.decodeFromConstraints({ video: VIDEO }, video, (result) => {
-      // Called for every frame; `result` is only set when a barcode was decoded.
-      if (!result || done) return;
-      const isbn = isbnFromBarcode(result.getText());
-      if (isbn && continuous) {
-        if (isDuplicate(isbn)) onRepeat?.(isbn); // the same book is still in view
-        else onIsbn(isbn);
-      } else if (isbn) {
-        done = true;
-        onIsbn(isbn);
-      } else {
-        onUnrecognized();
-      }
-    });
-  } catch (error) {
-    stopWaiting();
-    throw error;
-  }
+  const controls = await reader.decodeFromConstraints({ video: VIDEO }, video, (result) => {
+    // Called for every frame; `result` is only set when a barcode was decoded.
+    if (!result || done) return;
+    const isbn = isbnFromBarcode(result.getText());
+    if (isbn && continuous) {
+      if (isDuplicate(isbn)) onRepeat?.(isbn); // the same book is still in view
+      else onIsbn(isbn);
+    } else if (isbn) {
+      done = true;
+      onIsbn(isbn);
+    } else {
+      onUnrecognized();
+    }
+  });
   return () => {
     done = true;
     controls.stop();
-    stopWaiting();
-    video.classList.remove('live');
   };
 }

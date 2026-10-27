@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDedupe, isbnFromBarcode, loadZxing, revealWhenSteady } from '../src/scanner.js';
+import { createDedupe, isbnFromBarcode, loadZxing } from '../src/scanner.js';
 
 test('accepts book EAN-13 barcodes (978 and 979)', () => {
   assert.equal(isbnFromBarcode('9780747532699'), '9780747532699');
@@ -87,26 +87,4 @@ test('createDedupe tracks each key separately', () => {
   assert.equal(isDuplicate('a'), false);
   assert.equal(isDuplicate('b'), false);
   assert.equal(isDuplicate('a'), true);
-});
-
-test('the video is shown only after its picture has stopped changing', async () => {
-  const video = Object.assign(new EventTarget(), { classList: new Set(), });
-  video.classList.add = (name) => Set.prototype.add.call(video.classList, name);
-  video.classList.remove = (name) => Set.prototype.delete.call(video.classList, name);
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const stop = revealWhenSteady(video, 40);
-  assert.equal(video.classList.has('live'), false);
-  video.dispatchEvent(new Event('playing'));
-  await sleep(25);
-  video.dispatchEvent(new Event('resize')); // the picture changed size: the wait starts again
-  await sleep(25);
-  assert.equal(video.classList.has('live'), false);
-  await sleep(40);
-  assert.equal(video.classList.has('live'), true);
-  stop();
-
-  const cancelled = Object.assign(new EventTarget(), { classList: { add() { throw new Error('shown'); }, remove() {} } });
-  revealWhenSteady(cancelled, 20)();
-  cancelled.dispatchEvent(new Event('playing'));
-  await sleep(40); // stopped before it was shown: nothing happens
 });

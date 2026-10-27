@@ -1,7 +1,7 @@
 // Measures the scanner in a real camera: time to the first book barcode and decode attempts per second.
 // Not part of the app (not linked from index.html); open bench.html over https or localhost.
 // Results are kept in localStorage, so a page reload (a stuck camera) does not lose them.
-import { isbnFromBarcode, loadZxing, revealWhenSteady } from './scanner.js';
+import { isbnFromBarcode, loadZxing } from './scanner.js';
 
 const TIMEOUT_MS = 15000;
 const CAMERA_TIMEOUT_MS = 10000;
@@ -42,7 +42,6 @@ function save() {
   }
 }
 const runs = load();
-let timeline = []; // of the last run, not saved
 
 for (const name of Object.keys(CONFIGS).sort()) $('cfg').add(new Option(name));
 
@@ -79,20 +78,10 @@ function closeCamera(stream) {
 const median = (xs) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.floor((xs.length - 1) / 2)] : '-');
 
 async function run(name, note, hold) {
-  timeline = [];
   const config = hold ? { ...CONFIGS[name], delay: 0 } : CONFIGS[name]; // hold: no pause between frames, to see what the decoder can do
   const row = { name, note, hold, ok: false };
   let stream;
   let decoder;
-  // what the picture does while the camera starts (the iPhone's picture jumps): when each event came, the picture's size and the video box
-  const began = performance.now();
-  const mark = (event) => {
-    const box = video.getBoundingClientRect();
-    timeline.push(`+${Math.round(performance.now() - began)} ms ${event.type ?? event}: picture ${video.videoWidth}x${video.videoHeight}, box ${Math.round(box.width)}x${Math.round(box.height)} at ${Math.round(box.left)},${Math.round(box.top)}`);
-  };
-  const watched = ['loadedmetadata', 'playing', 'resize'];
-  for (const event of watched) video.addEventListener(event, mark);
-  const stopWaiting = revealWhenSteady(video, undefined, () => mark('shown'));
   try {
     const started = performance.now();
     stream = await Promise.race([openCamera(config.video), timeout(CAMERA_TIMEOUT_MS, 'the camera did not start')]);
@@ -113,8 +102,6 @@ async function run(name, note, hold) {
     row.error = String(error?.message ?? error);
   } finally {
     try { decoder?.stop(); } catch { /* already stopped */ }
-    for (const event of watched) video.removeEventListener(event, mark);
-    stopWaiting();
     closeCamera(stream);
   }
   return row;
@@ -137,7 +124,7 @@ function report() {
       median(good.map((r) => r.cameraMs)), good[0]?.size ?? '-', good[0]?.focus ?? '-'].join(' | '));
   }
   const last = runs.at(-1);
-  $('out').textContent = `${lines.join('\n')}\n\nUA: ${navigator.userAgent}${last?.error ? `\nLast run failed: ${last.error}` : ''}${timeline.length ? `\n\nLast run, the picture:\n${timeline.join('\n')}` : ''}`;
+  $('out').textContent = `${lines.join('\n')}\n\nUA: ${navigator.userAgent}${last?.error ? `\nLast run failed: ${last.error}` : ''}`;
 }
 
 $('run').onclick = async () => {
