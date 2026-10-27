@@ -66,7 +66,7 @@ body:has(#isbn:focus) .scan-dock { display: none; }
 #scan > * { position: relative; }
 #scan.stop { background: var(--error); color: var(--on-accent); }
 #scanner { margin-top: 1rem; }
-#preview { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; max-height: 50vh; background: #000; border-radius: 12px; } /* a fixed shape from the start: without it the box is 150px high until the camera starts, then jumps */
+#preview { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; max-height: 50vh; background: #000; border-radius: 12px; opacity: 0; transition: opacity .2s; } /* invisible until revealWhenSteady (src/scanner.js) adds .live; a fixed shape from the start: without it the box is 150px high until the camera starts, then jumps */
 /* A brief shutter flash over the page when the camera reads a barcode (even if the scanner closes at once). */
 #snap { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: #ffb300; }
 #snap.flash { animation: snap .5s ease-out; }
@@ -125,6 +125,7 @@ body:has(#scanner:not([hidden])) #status:empty { display: block; }
 .candidate-title { font-weight: 600; overflow-wrap: anywhere; }
 .candidate-author { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
 .candidate-author:empty { display: none; }
+#preview.live { opacity: 1; }
 .warning { margin: 1rem 0 0; padding: .6rem .8rem; border-radius: 8px; border: 1px solid var(--error); color: var(--error); background: var(--card); }
 .meta { color: var(--muted); margin: .25rem 0; }
 .footer { margin-top: 2rem; font-size: .8rem; text-align: center; }
