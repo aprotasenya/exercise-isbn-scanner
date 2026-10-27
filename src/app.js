@@ -25,7 +25,8 @@ const button = form.querySelector('button[type="submit"]');
 const scanButton = document.getElementById('scan');
 const scanLabel = document.getElementById('scan-label');
 const scanner = document.getElementById('scanner');
-let preview = document.getElementById('preview');
+let preview = document.getElementById('preview'); // plays the camera, out of sight
+const view = document.getElementById('view'); // shows it
 const themeButton = document.getElementById('theme');
 
 function browserStorage() {
@@ -516,6 +517,7 @@ async function openScanner(continuous = false) {
   preview = fresh;
   try {
     const stop = await startScanner(preview, {
+      canvas: view,
       onIsbn(isbn) {
         // high = a new book, low = already scanned, lowest = list full (not added)
         const again = scanned.has(isbn);

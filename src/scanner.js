@@ -50,11 +50,48 @@ export function loadZxing() {
   return zxingLoaded;
 }
 
-// Starts the camera in `video` and resolves to a function that stops it.
+// The part [x, y, width, height] of a picture w x h that fills a box cw x ch without stretching, centered (the CSS `object-fit: cover`).
+export function coverRect(w, h, cw, ch) {
+  const scale = Math.max(cw / w, ch / h);
+  const sw = cw / scale;
+  const sh = ch / scale;
+  return [(w - sw) / 2, (h - sh) / 2, sw, sh];
+}
+
+// Shows what `video` plays in `canvas`, cropped to fill it, one drawing per new frame. The <video> element itself is
+// not shown: an iPhone lays it out late (the picture first at its own size, then fitted to the box), and here every
+// frame is fitted to the box before it is drawn. Returns a function that stops the drawing and clears the picture.
+export function drawPreview(video, canvas) {
+  const context = canvas.getContext('2d');
+  let stopped = false;
+  const next = () => (video.requestVideoFrameCallback ? video.requestVideoFrameCallback(draw) : requestAnimationFrame(draw));
+  function draw() {
+    if (stopped) return;
+    if (video.videoWidth && video.videoHeight) {
+      const box = canvas.getBoundingClientRect();
+      const scale = Math.min(globalThis.devicePixelRatio || 1, 2); // enough sharpness for a preview, and fewer pixels to draw
+      const width = Math.round(box.width * scale);
+      const height = Math.round(box.height * scale);
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      context.drawImage(video, ...coverRect(video.videoWidth, video.videoHeight, width, height), 0, 0, width, height);
+    }
+    next();
+  }
+  next();
+  return () => {
+    stopped = true;
+    context.clearRect(0, 0, canvas.width, canvas.height); // else the next start begins with this session's last frame
+  };
+}
+
+// Starts the camera in `video` (shown in `canvas`, if given) and resolves to a function that stops it.
 // By default the first book ISBN ends the scan; with `continuous`, `onIsbn` keeps firing
 // for each newly seen book and `onRepeat` for every further sighting of a book still in view. Rejects if the library cannot load or the camera is
 // denied/unavailable.
-export async function startScanner(video, { onIsbn, onUnrecognized, onRepeat, continuous = false }) {
+export async function startScanner(video, { canvas, onIsbn, onUnrecognized, onRepeat, continuous = false }) {
   const { BrowserMultiFormatOneDReader } = await loadZxing();
   const reader = new BrowserMultiFormatOneDReader(undefined, { delayBetweenScanAttempts: SCAN_INTERVAL_MS });
   let done = false;
@@ -73,8 +110,10 @@ export async function startScanner(video, { onIsbn, onUnrecognized, onRepeat, co
       onUnrecognized();
     }
   });
+  const stopDrawing = canvas ? drawPreview(video, canvas) : () => {};
   return () => {
     done = true;
+    stopDrawing();
     controls.stop();
   };
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDedupe, isbnFromBarcode, loadZxing } from '../src/scanner.js';
+import { coverRect, createDedupe, isbnFromBarcode, loadZxing } from '../src/scanner.js';
 
 test('accepts book EAN-13 barcodes (978 and 979)', () => {
   assert.equal(isbnFromBarcode('9780747532699'), '9780747532699');
@@ -87,4 +87,10 @@ test('createDedupe tracks each key separately', () => {
   assert.equal(isDuplicate('a'), false);
   assert.equal(isDuplicate('b'), false);
   assert.equal(isDuplicate('a'), true);
+});
+
+test('coverRect crops a picture to fill a box without stretching, from the center', () => {
+  assert.deepEqual(coverRect(1080, 1920, 400, 300), [0, 555, 1080, 810]); // a portrait picture in a 4:3 box: a band across the middle
+  assert.deepEqual(coverRect(1920, 1080, 300, 400), [555, 0, 810, 1080]); // a landscape one in a portrait box: a band down the middle
+  assert.deepEqual(coverRect(640, 480, 400, 300), [0, 0, 640, 480]); // the same shape: all of it
 });
