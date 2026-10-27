@@ -4,7 +4,7 @@
 // rating, a title that still has its brackets) is still readable, but the app asks the service again.
 import { createKeyed } from './keyed.js';
 
-export const META_VERSION = 2;
+export const META_VERSION = 5;
 const isEntry = (e) => e && typeof e.isbn === 'string' && typeof e.title === 'string';
 
 export function createMeta(store, limit = 1000) {

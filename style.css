@@ -112,6 +112,19 @@ body:has(#scanner:not([hidden])) #status:empty { display: block; }
   text-decoration: underline dashed; text-decoration-thickness: 1px; text-decoration-color: var(--muted); text-underline-offset: .22em; }
 .title-edit:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .title-input { border-color: var(--link); background: var(--bg); color: var(--fg); }
+/* The title-search pick list: the rows share one rounded rectangle, split by hairlines; each row is one tap target. */
+#result:has(.candidates) { margin-top: .5rem; }
+.candidates { list-style: none; margin: 0; padding: 0; overflow: hidden; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.candidates li + li { border-top: 1px solid var(--line); }
+.candidate { display: flex; align-items: center; gap: .75rem; width: 100%; box-sizing: border-box; padding: .3rem .75rem; border: 0; border-radius: 0; background: none; text-align: left; }
+.candidate:active { background: var(--bg); }
+@media (hover: hover) { .candidate:hover { background: var(--bg); } }
+.candidate:focus-visible { outline-offset: -2px; } /* the list clips what sticks out of it */
+.candidate .cover { flex: none; width: 40px; height: 60px; object-fit: cover; border-radius: 3px; border: 1px solid var(--line); }
+.candidate-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: .1rem; line-height: 1.25; }
+.candidate-title { font-weight: 600; overflow-wrap: anywhere; }
+.candidate-author { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.candidate-author:empty { display: none; }
 .warning { margin: 1rem 0 0; padding: .6rem .8rem; border-radius: 8px; border: 1px solid var(--error); color: var(--error); background: var(--card); }
 .meta { color: var(--muted); margin: .25rem 0; }
 /* The lookup buttons under the name: the site icon at twice its 32px size, the name beneath. */
@@ -148,8 +161,8 @@ body:has(#scanner:not([hidden])) #status:empty { display: block; }
 .book-list .icon { min-width: 2.25rem; min-height: 2.25rem; padding: 0; font-size: 1.1rem; }
 .book-list .icon-link { width: 2.25rem; height: 2.25rem; }
 .book-list .icon-link img { width: 22px; height: 22px; }
-/* The underline sits well below the letters and is not interrupted by them; the padding gives it (and the edge of the
-   first letter) room inside the box that cuts long names, and the negative margin keeps the text edge aligned. */
-.book-list .open { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .3em; text-decoration-skip-ink: none; }
+/* The underline (also on the card's series and author links) sits well below the letters and is not interrupted by
+   them; the padding gives it (and the edge of the first letter) room inside the box that cuts long names, and the negative margin keeps the text edge aligned. */
+.book-list .open, .facts a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .3em; text-decoration-skip-ink: none; }
 .book-list .open:disabled { color: var(--muted); cursor: default; }
 .list-actions { display: flex; flex-wrap: wrap; gap: .5rem; }

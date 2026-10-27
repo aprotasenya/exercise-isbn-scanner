@@ -1,15 +1,16 @@
-import { isValidIsbn, normalizeIsbn } from './isbn.js';
+import { isValidIsbn, looksLikeIsbn, normalizeIsbn } from './isbn.js';
 import { isbnLinks } from './links.js';
 import { startScanner } from './scanner.js';
 import { hashForIsbn, isbnFromHash } from './hash.js';
 import { createListStore } from './storage.js';
 import { createBookList } from './bookList.js';
 import { createNames } from './names.js';
+import { createFoundBy } from './foundBy.js';
 import { createTitles } from './titles.js';
 import { loadSort, saveSort } from './sort.js';
 import { META_VERSION, createMeta } from './meta.js';
 import { factsBlock, ratingBlock } from './details.js';
-import { LOOKUP_URL, lookupBook } from './lookup.js';
+import { LOOKUP_URL, isbnOfBook, lookupBook, searchBooks } from './lookup.js';
 import { createListView, createMarkToggle, iconButton } from './listView.js';
 import { el, linkButton, spinner } from './dom.js';
 import { applyTheme, loadTheme, nextTheme, saveTheme } from './theme.js';
@@ -38,6 +39,8 @@ function browserStorage() {
 const scanned = createBookList(createListStore(browserStorage(), 'isbn-reader.scanned'));
 const marked = createBookList(createListStore(browserStorage(), 'isbn-reader.marked'));
 const names = createNames(createListStore(browserStorage(), 'isbn-reader.names'));
+// the title and author a book was found by (picked from a title search): its site links search for them
+const foundBy = createFoundBy(createListStore(browserStorage(), 'isbn-reader.search'));
 const meta = createMeta(createListStore(browserStorage(), 'isbn-reader.meta'));
 
 // Opening a book from a list shows its card but does not move it in Scanned: only a new
@@ -91,6 +94,7 @@ const scannedView = createListView({
   onChange: renderLists,
   isWaiting: (isbn) => pending.has(isbn),
   ratings: meta.ratings,
+  foundBy: foundBy.all,
   sortMode: loadSort(browserStorage(), 'scanned'),
   onSort: (mode) => saveSort(browserStorage(), 'scanned', mode),
   notify: (text, isError) => setStatus(text, isError, isError ? 0 : NOTE_MS),
@@ -111,6 +115,7 @@ const markedView = createListView({
   onChange: renderLists,
   isWaiting: (isbn) => pending.has(isbn),
   ratings: meta.ratings,
+  foundBy: foundBy.all,
   sortMode: loadSort(browserStorage(), 'marked'),
   onSort: (mode) => saveSort(browserStorage(), 'marked', mode),
   notify: (text, isError) => setStatus(text, isError, isError ? 0 : NOTE_MS),
@@ -247,7 +252,7 @@ function renderBook(book, isbn) {
   head.append(body, markToggle.create(book, isbn));
   setDetails(meta.get(isbn));
   const links = el('div', null, 'link-row');
-  links.append(...isbnLinks(isbn).map((link) => linkButton(link, { big: true })));
+  links.append(...isbnLinks(isbn, foundBy.get(isbn)).map((link) => linkButton(link, { big: true })));
   card.append(head, facts, links);
   result.replaceChildren(card);
   shown = { card, isbn, book, update, setDetails, setWaiting };
@@ -448,6 +453,7 @@ function sightedAgain(isbn) {
 }
 
 function addScanned(isbn) {
+  foundBy.set(isbn); // a barcode is the real ISBN of the book in hand
   clearHint();
   clearWarning();
   if (scanned.has(isbn)) {
@@ -548,18 +554,67 @@ scanButton.addEventListener('click', () => {
 });
 window.addEventListener('pagehide', closeScanner);
 
+// The field takes an ISBN or a title: only something that looks like an ISBN is checked as one (see looksLikeIsbn).
 form.addEventListener('submit', (event) => {
   event.preventDefault();
+  const text = input.value.trim();
+  if (LOOKUP_URL && text && !looksLikeIsbn(text)) return searchTitle(text);
   search(normalizeIsbn(input.value));
 });
+
+// Title search: the candidates from Goodreads are listed on the page; the one picked gives its ISBN, and the
+// book is then shown like any other, except that its links search for the title. `pickToken` drops the answer
+// of a search or pick that a newer search has replaced.
+let pickToken = 0;
+
+async function searchTitle(text) {
+  const token = ++pickToken;
+  closeScanner();
+  result.replaceChildren();
+  clearWarning();
+  setStatus(t.searchingTitle);
+  const found = await searchBooks(text);
+  if (token !== pickToken) return;
+  if (!found) return setStatus(t.searchFailed, true);
+  if (!found.length) return setStatus(t.noTitleResults, true);
+  setStatus(t.pickBook);
+  result.replaceChildren(candidateList(found, token));
+  input.blur();
+}
+
+function candidateList(found, token) {
+  const list = el('ul', null, 'candidates');
+  for (const book of found) {
+    const pick = el('button', null, 'candidate');
+    pick.type = 'button';
+    if (book.image) pick.append(coverImage(book.image));
+    const text = el('span', null, 'candidate-text');
+    text.append(el('span', book.title, 'candidate-title'), el('span', book.author, 'candidate-author'));
+    pick.append(text);
+    pick.addEventListener('click', async () => {
+      setStatus(t.gettingIsbn);
+      const isbn = await isbnOfBook(book.id);
+      if (token !== pickToken) return;
+      if (!isbn) return setStatus(t.noIsbn(book.title), true);
+      input.value = isbn;
+      search(isbn, { found: book });
+    });
+    const item = el('li');
+    item.append(pick);
+    list.append(item);
+  }
+  return list;
+}
 
 // `push: false` is used when the search comes from the URL itself (load, Back/Forward);
 // those don't add a history entry. A valid search drops the focus from the field, so the phone keyboard closes.
 // `move: false`: the book is only shown again, so it keeps its place in the Scanned list.
-function search(isbn, { push = true, move = true } = {}) {
+function search(isbn, { push = true, move = true, found = null } = {}) {
+  pickToken++;
   closeScanner();
   result.replaceChildren();
   if (!isValidIsbn(isbn)) return setStatus(t.invalidIsbn, true);
+  if (move) foundBy.set(isbn, found?.title, found?.author); // a search by ISBN clears the title a book was once found by
   if (push && isbnFromHash(location.hash) !== isbn) history.pushState(null, '', hashForIsbn(isbn));
 
   const book = bookFor(isbn);
@@ -577,6 +632,7 @@ window.addEventListener('popstate', () => {
     input.value = isbn;
     search(isbn, { push: false, move: false });
   } else {
+    pickToken++;
     closeScanner();
     input.value = '';
     result.replaceChildren();

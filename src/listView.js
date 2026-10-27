@@ -57,11 +57,12 @@ function ratingTag(value) {
 //   onChange(): called after Clear, so every list and star in the page is redrawn;
 //   ratings(): Map of isbn -> rating value (a book without one is not in it); sortMode, onSort(mode): the list's
 //   order (see src/sort.js) and what to do when the user picks another one;
+//   foundBy(): Map of isbn -> { title, author } for the books found by a title search (their site links search for them, not the ISBN);
 //   isWaiting(isbn): true while the book's name is still being looked up (the row shows a spinner);
 //   notify(text, isError): status line; elements: { section, count, items, empty, copy, clear }
 // The section (a <details>) opens by itself when the list stops being empty (on load, or at the
 // first book added, also while scanning); after that the user's open/closed choice is left alone.
-export function createListView({ list, confirmClear, rowButton, onOpen, onChange, isWaiting = () => false, ratings = () => new Map(), sortMode = 'date', onSort = () => {}, notify, elements }) {
+export function createListView({ list, confirmClear, rowButton, onOpen, onChange, isWaiting = () => false, ratings = () => new Map(), foundBy = () => new Map(), sortMode = 'date', onSort = () => {}, notify, elements }) {
   const { section, count, items, empty, copy, clear } = elements;
   let locked = false;
   let wasEmpty = true;
@@ -81,6 +82,7 @@ export function createListView({ list, confirmClear, rowButton, onOpen, onChange
     stale = !section.open;
     if (stale) return;
     const rated = ratings();
+    const found = foundBy();
     items.replaceChildren(...ordered(all, rated).map((book) => {
       const item = el('li');
       const open = el('button', book.title, 'open');
@@ -90,7 +92,7 @@ export function createListView({ list, confirmClear, rowButton, onOpen, onChange
       open.addEventListener('click', () => onOpen(book.isbn));
       const actions = el('span', null, 'row-actions');
       actions.append(
-        ...isbnLinks(book.isbn).map((link) => linkButton(link)),
+        ...isbnLinks(book.isbn, found.get(book.isbn)).map((link) => linkButton(link)),
         rowButton(book),
       );
       item.append(open);

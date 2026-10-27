@@ -2,6 +2,10 @@ export function normalizeIsbn(input) {
   return String(input).replace(/[\s-]/g, '').toUpperCase();
 }
 
+// Text typed into the field that is meant as an ISBN (digits, spaces, hyphens and X, at least 10 of them), even if
+// its checksum is wrong: it gets the "invalid ISBN" message. Anything else is a title ("1984" too).
+export const looksLikeIsbn = (text) => /^[\d\sX-]{10,}$/i.test(text);
+
 export function isValidIsbn(input) {
   const isbn = normalizeIsbn(input);
   if (/^\d{13}$/.test(isbn)) {

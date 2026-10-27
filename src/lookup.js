@@ -1,9 +1,13 @@
-// The app's only network call: asks the lookup service (worker/) for a book's name, cover, series, author and rating.
+// The app's only network calls, all to the lookup service (worker/): a book's name, cover, series, author and rating
+// by ISBN; and, for a book typed by title, the candidates from Goodreads' search and the ISBN of the one picked.
 // The app works fully without it: every failure (no URL set, offline, unknown book, slow answer)
 // gives null and the book stays `ISBN <number>`.
+import { isValidIsbn, normalizeIsbn } from './isbn.js';
+
 export const LOOKUP_URL = 'https://isbn-lookup.oleprota.workers.dev'; // the deployed worker (worker/README.md); '' turns the lookup off
 const TIMEOUT_MS = 5000;
-const SHAPE = 3; // the answer's shape, same as `v3` in worker/index.js: it keeps the browser's HTTP cache from serving an answer of an older shape
+const SEARCH_TIMEOUT_MS = 12000; // the worker may ask Goodreads up to 4 times in a row (it drops words while nothing is found)
+const SHAPE = 6; // the answer's shape, same as `v6` in worker/index.js: it keeps the browser's HTTP cache from serving an answer of an older shape
 const BUSY_WAIT_MS = 5000; // the worker answered 429 (too many lookups at once): the request waits and goes again
 const BUSY_RETRIES = 3;
 
@@ -30,14 +34,35 @@ export function cleanAnswer(data) {
   };
 }
 
-// Returns the cleaned answer or null. Never throws. A 429 puts the request in a queue of sorts: it
-// waits and asks again (up to BUSY_RETRIES times), so the caller's spinner runs until the final answer.
-export async function lookupBook(isbn, { url = LOOKUP_URL, fetchFn = fetch, timeout = TIMEOUT_MS, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+// The candidates of a title search: up to 5 of { id, title, author, image }, or null when the answer is not a list of results.
+export function cleanResults(data) {
+  if (!Array.isArray(data?.results)) return null;
+  return data.results
+    .map((b) => ({
+      id: String(b?.id ?? ''),
+      title: clean(b?.title, 120),
+      author: clean(b?.author, 100),
+      image: typeof b?.image === 'string' && b.image.startsWith('https://') ? b.image : '',
+    }))
+    .filter((b) => /^\d{1,12}$/.test(b.id) && b.title)
+    .slice(0, 5);
+}
+
+// The ISBN of a Goodreads edition, or null.
+export function cleanIsbn(data) {
+  const isbn = normalizeIsbn(data?.isbn ?? '');
+  return isValidIsbn(isbn) ? isbn : null;
+}
+
+// Asks the service and returns what `parse` makes of the answer, or null. Never throws. A 429 puts the
+// request in a queue of sorts: it waits and asks again (up to BUSY_RETRIES times), so the caller's
+// spinner runs until the final answer.
+async function ask(path, params, parse, { url = LOOKUP_URL, fetchFn = fetch, timeout = TIMEOUT_MS, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
   if (!url) return null;
   for (let attempt = 0; attempt <= BUSY_RETRIES; attempt++) {
     try {
-      const response = await fetchFn(`${url}/lookup?isbn=${encodeURIComponent(isbn)}&v=${SHAPE}`, { signal: AbortSignal.timeout(timeout) });
-      if (response.status !== 429) return response.ok ? cleanAnswer(await response.json()) : null;
+      const response = await fetchFn(`${url}/${path}?${new URLSearchParams(params)}`, { signal: AbortSignal.timeout(timeout) });
+      if (response.status !== 429) return response.ok ? parse(await response.json()) : null;
     } catch {
       return null;
     }
@@ -45,3 +70,8 @@ export async function lookupBook(isbn, { url = LOOKUP_URL, fetchFn = fetch, time
   }
   return null;
 }
+
+export const lookupBook = (isbn, options) => ask('lookup', { isbn, v: SHAPE }, cleanAnswer, options);
+// null = the search failed; [] = it found nothing
+export const searchBooks = (query, options) => ask('search', { q: query }, cleanResults, { timeout: SEARCH_TIMEOUT_MS, ...options });
+export const isbnOfBook = (id, options) => ask('book', { id }, cleanIsbn, options);

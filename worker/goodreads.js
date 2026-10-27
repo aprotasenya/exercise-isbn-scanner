@@ -1,5 +1,7 @@
 // Reads a book out of a Goodreads book page: the schema.org `Book` block in its
 // <script type="application/ld+json"> (the og: tags hold the same data, but og:title is cut at ~60 characters).
+import { isValidIsbn, normalizeIsbn } from '../src/isbn.js';
+
 const MARKER = 'application/ld+json';
 const CLOSE = '</script>';
 
@@ -66,11 +68,35 @@ function ratingOf(rating) {
   return value > 0 && value <= 5 && Number.isInteger(count) && count > 0 ? { value, count } : null;
 }
 
-// `{ title, series, author, rating, image }` for the first Book in the page, or null (no title = no data).
-export function parseBook(html) {
-  const book = jsonLdBlocks(html)
+const findBook = (html) =>
+  jsonLdBlocks(html)
     .flatMap((block) => (Array.isArray(block) ? block : [block]))
     .find((block) => block?.['@type'] === 'Book');
+
+// `{ isbn }`: the ISBN of the edition the page is about (when it has a valid one), or null.
+export function parseIsbn(html) {
+  const isbn = normalizeIsbn(findBook(html)?.isbn ?? '');
+  return isValidIsbn(isbn) ? { isbn } : null;
+}
+
+// The books in Goodreads' search-as-you-type answer (an array): up to 5 of
+// `{ id, title, author, image }`. Entries without an id or a title are dropped.
+export function parseCandidates(data) {
+  if (!Array.isArray(data)) return null;
+  return data
+    .map((b) => ({
+      id: String(b?.bookId ?? ''),
+      title: text(b?.bookTitleBare ?? b?.title, 120),
+      author: text(b?.author?.name, 100),
+      image: typeof b?.imageUrl === 'string' && b.imageUrl.startsWith('https://') ? b.imageUrl : '',
+    }))
+    .filter((b) => /^\d{1,12}$/.test(b.id) && b.title)
+    .slice(0, 5);
+}
+
+// `{ title, series, author, rating, image }` for the first Book in the page, or null (no title = no data).
+export function parseBook(html) {
+  const book = findBook(html);
   const name = text(book?.name, 200);
   if (!name) return null;
   const { title, series } = splitTitle(name);

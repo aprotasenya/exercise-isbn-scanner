@@ -3,14 +3,24 @@
 // fetched from the sites to show them.
 import { t } from './strings.js';
 
-export function isbnLinks(isbn) {
+// A book found by title (`found`: { title, author }, see foundBy.js) links to searches instead of the ISBN:
+// Ereadian for the title alone (its search misses a book when an author is spelled differently there), Goodreads
+// for the title and the author (the title alone finds too many other books).
+export function isbnLinks(isbn, found = null) {
   const q = encodeURIComponent(isbn);
+  if (!found) {
+    return [
+      { name: 'Ereadian', url: `https://ereadian.com/search?q=${q}`, icon: 'icons/ereadian.png', title: t.linkTitle(isbn, 'Ereadian') },
+      { name: 'Goodreads', url: `https://www.goodreads.com/book/isbn/${q}`, icon: 'icons/goodreads.png', title: t.linkTitle(isbn, 'Goodreads') },
+    ];
+  }
+  const withAuthor = [found.title, found.author].filter(Boolean).join(' ');
   return [
-    { name: 'Ereadian', url: `https://ereadian.com/search?q=${q}`, icon: 'icons/ereadian.png', title: t.linkTitle(isbn, 'Ereadian') },
-    { name: 'Goodreads', url: `https://www.goodreads.com/book/isbn/${q}`, icon: 'icons/goodreads.png', title: t.linkTitle(isbn, 'Goodreads') },
+    { name: 'Ereadian', url: `https://ereadian.com/search?q=${encodeURIComponent(found.title)}`, icon: 'icons/ereadian.png', title: t.searchLinkTitle(found.title, 'Ereadian') },
+    { name: 'Goodreads', url: goodreadsSearch(withAuthor), icon: 'icons/goodreads.png', title: t.searchLinkTitle(withAuthor, 'Goodreads') },
   ];
 }
 
-// A Goodreads search for a series by its name. The series' own page has an id that the lookup does
-// not return, so a search stands in for it.
-export const seriesUrl = (name) => `https://www.goodreads.com/search?q=${encodeURIComponent(name)}`;
+// A Goodreads search by text. Also stands in for a series' own page, which has an id that the lookup
+// does not return.
+export const goodreadsSearch = (text) => `https://www.goodreads.com/search?q=${encodeURIComponent(text)}`;

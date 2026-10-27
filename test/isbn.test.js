@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isValidIsbn, normalizeIsbn } from '../src/isbn.js';
+import { isValidIsbn, looksLikeIsbn, normalizeIsbn } from '../src/isbn.js';
 
 test('normalizeIsbn strips hyphens and spaces', () => {
   assert.equal(normalizeIsbn('978-0-14-032872-1'), '9780140328721');
@@ -18,4 +18,9 @@ test('invalid checksum or format', () => {
   assert.equal(isValidIsbn('9780140328722'), false);
   assert.equal(isValidIsbn('abc'), false);
   assert.equal(isValidIsbn(''), false);
+});
+
+test('text that looks like an ISBN is checked as one; anything else is a title', () => {
+  for (const text of ['9780140328721', '978-0-14-032872-1', '0 8044 2957 x', '080442957X', '1234567890123']) assert.ok(looksLikeIsbn(text), text); // the last has a wrong checksum: still an ISBN attempt
+  for (const text of ['1984', '12345', 'Хірург', 'Хірург Тесс 2', 'The Surgeon', 'X', '']) assert.ok(!looksLikeIsbn(text), text);
 });

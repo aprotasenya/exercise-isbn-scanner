@@ -2,7 +2,7 @@
 // series and author with links to Goodreads. All text goes in via textContent.
 import { el } from './dom.js';
 import { formatRating, t } from './strings.js';
-import { seriesUrl } from './links.js';
+import { goodreadsSearch } from './links.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -41,7 +41,7 @@ export function factsBlock({ series, author }) {
   const facts = el('dl', null, 'facts');
   if (series) {
     const value = el('dd');
-    value.append(outsideLink(seriesUrl(series.name), series.name));
+    value.append(outsideLink(goodreadsSearch(series.name), series.name));
     if (series.number) value.append(el('span', ` #${series.number}`, 'series-number'));
     facts.append(el('dt', t.seriesLabel), value);
   }

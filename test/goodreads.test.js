@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseBook, splitTitle } from '../worker/goodreads.js';
+import { parseBook, parseCandidates, parseIsbn, splitTitle } from '../worker/goodreads.js';
 
 const page = (...blocks) =>
   `<html><head>${blocks.map((b) => `<script type="application/ld+json">${typeof b === 'string' ? b : JSON.stringify(b)}</script>`).join('')}</head></html>`;
@@ -18,7 +18,7 @@ const book = {
   aggregateRating: { '@type': 'AggregateRating', ratingValue: 4.66, ratingCount: 734385, reviewCount: 59741 },
 };
 
-test('reads title, series, first author, rating and cover from the Book block', () => {
+test('reads title, series, author, rating and cover from the Book block', () => {
   assert.deepEqual(parseBook(page(book)), {
     title: 'Шлях королів',
     series: { name: 'Хроніки Буресвітла', number: '1' },
@@ -77,4 +77,16 @@ test('no Book block or no name is no data', () => {
   assert.equal(parseBook('<html>no data</html>'), null);
   assert.equal(parseBook(page({ '@type': 'Book', name: '  ' })), null);
   assert.equal(parseBook('<script type="application/ld+json">{"@type":"Book","name":"Cut off"'), null);
+});
+
+test('parseIsbn gives the edition\'s ISBN when it is valid, else null', () => {
+  assert.deepEqual(parseIsbn(page({ ...book, isbn: '978-617-129-941-2' })), { isbn: '9786171299412' });
+  assert.equal(parseIsbn(page({ ...book, isbn: '9786171299413' })), null);
+  assert.equal(parseIsbn(page(book)), null);
+  assert.equal(parseIsbn('<html></html>'), null);
+});
+
+test('parseCandidates keeps id and title, cleans the rest, and is null for a non-list', () => {
+  assert.equal(parseCandidates({}), null);
+  assert.deepEqual(parseCandidates([null, { bookId: 5 }, { bookId: '5', title: 'Fallback' }]), [{ id: '5', title: 'Fallback', author: '', image: '' }]);
 });

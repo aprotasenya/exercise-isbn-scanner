@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isbnLinks, seriesUrl } from '../src/links.js';
+import { goodreadsSearch, isbnLinks } from '../src/links.js';
 import { existsSync, readFileSync } from 'node:fs';
 import isbns from './fixtures/isbns.json' with { type: 'json' };
 
@@ -35,6 +35,16 @@ test('every link has an icon file in the repo, and it is a PNG', () => {
 });
 
 test('a series link is a Goodreads search for its name, encoded', () => {
-  assert.equal(seriesUrl('Хроніки Буресвітла'), 'https://www.goodreads.com/search?q=%D0%A5%D1%80%D0%BE%D0%BD%D1%96%D0%BA%D0%B8%20%D0%91%D1%83%D1%80%D0%B5%D1%81%D0%B2%D1%96%D1%82%D0%BB%D0%B0');
-  assert.ok(seriesUrl('A&B #1').endsWith('q=A%26B%20%231'));
+  assert.equal(goodreadsSearch('Хроніки Буресвітла'), 'https://www.goodreads.com/search?q=%D0%A5%D1%80%D0%BE%D0%BD%D1%96%D0%BA%D0%B8%20%D0%91%D1%83%D1%80%D0%B5%D1%81%D0%B2%D1%96%D1%82%D0%BB%D0%B0');
+  assert.ok(goodreadsSearch('A&B #1').endsWith('q=A%26B%20%231'));
+});
+
+test('a book found by title links to a title search on Ereadian and a title-and-author search on Goodreads', () => {
+  const [ereadian, goodreads] = isbnLinks('9786171299412', { title: 'Хірург & Co', author: 'Tess Gerritsen' });
+  assert.equal(ereadian.url, 'https://ereadian.com/search?q=%D0%A5%D1%96%D1%80%D1%83%D1%80%D0%B3%20%26%20Co');
+  assert.equal(goodreads.url, 'https://www.goodreads.com/search?q=%D0%A5%D1%96%D1%80%D1%83%D1%80%D0%B3%20%26%20Co%20Tess%20Gerritsen');
+  assert.equal(ereadian.title, 'Шукати «Хірург & Co» на Ereadian');
+  assert.equal(goodreads.title, 'Шукати «Хірург & Co Tess Gerritsen» на Goodreads');
+  assert.equal(isbnLinks('9786171299412', { title: 'Хірург', author: '' })[1].url, 'https://www.goodreads.com/search?q=%D0%A5%D1%96%D1%80%D1%83%D1%80%D0%B3');
+  assert.deepEqual(isbnLinks('9786171299412', null), isbnLinks('9786171299412'));
 });
