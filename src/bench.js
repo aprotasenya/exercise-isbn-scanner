@@ -12,16 +12,14 @@ const FOCUSED = { ...HD, advanced: [{ focusMode: 'continuous' }] };
 
 const HOLD_MS = 5000; // "hold" mode: the barcode stays in view and every frame the decoder can take is counted
 
-// A is what the app did before; each next config changes one thing. `decoder`: zxing = the JS port in the app,
-// native = the browser's own BarcodeDetector (Chrome/Android), wasm = zxing-cpp in WebAssembly (vendor/barcode-detector.js).
+// A is what the app did before; each next config changes one thing. D is what the app does now. (A native BarcodeDetector
+// and zxing-cpp in WebAssembly were benched against D on an iPhone and an Android phone and were not better: see the git history.)
 const CONFIGS = {
-  'A before (zxing, 500 ms)': { decoder: 'zxing', delay: 500 },
-  'B 1080p': { decoder: 'zxing', delay: 500, video: HD },
-  'C 1080p + autofocus': { decoder: 'zxing', delay: 500, video: FOCUSED },
-  'D C + 250 ms loop': { decoder: 'zxing', delay: 250, video: FOCUSED },
-  'F wasm, 250 ms': { decoder: 'wasm', delay: 250, video: FOCUSED },
+  'A before (zxing, 500 ms)': { delay: 500 },
+  'B 1080p': { delay: 500, video: HD },
+  'C 1080p + autofocus': { delay: 500, video: FOCUSED },
+  'D C + 250 ms loop': { delay: 250, video: FOCUSED },
 };
-if ('BarcodeDetector' in window) CONFIGS['E native, 250 ms'] = { decoder: 'native', delay: 250, video: FOCUSED };
 
 const $ = (id) => document.getElementById(id);
 const video = $('v');
@@ -47,48 +45,22 @@ const runs = load();
 
 for (const name of Object.keys(CONFIGS).sort()) $('cfg').add(new Option(name));
 
-let wasm; // the WebAssembly detector, made once
-async function wasmDetector() {
-  if (!wasm) {
-    const { BarcodeDetector, setZXingModuleOverrides } = await import('../vendor/barcode-detector.js');
-    setZXingModuleOverrides({ locateFile: (path, prefix) => (path.endsWith('.wasm') ? new URL('../vendor/zxing_reader.wasm', import.meta.url).href : prefix + path) });
-    wasm = new BarcodeDetector({ formats: ['ean_13'] });
-    await wasm.detect(document.createElement('canvas')).catch(() => {}); // loads and compiles the module now, not during the timed run
-  }
-  return wasm;
-}
-
 // Starts decoding `video` with the config's decoder. Returns { hit, stop, stats }: `hit` settles with the time of the first book barcode.
-async function startDecoder({ decoder, delay }) {
-  const stats = { attempts: 0, hits: 0, detectMs: [] };
-  let active = true;
+async function startDecoder({ delay }) {
+  const stats = { attempts: 0, hits: 0 };
   let found;
   const hit = new Promise((resolve) => { found = resolve; }); // the time of the first book barcode
   const seen = () => {
     stats.hits += 1;
     if (stats.hits === 1) found(performance.now());
   };
-  if (decoder === 'zxing') {
-    const { BrowserMultiFormatOneDReader } = await loadZxing();
-    const reader = new BrowserMultiFormatOneDReader(undefined, { delayBetweenScanAttempts: delay, delayBetweenScanSuccess: delay });
-    const controls = await reader.decodeFromVideoElement(video, (result) => {
-      stats.attempts += 1;
-      if (result && isbnFromBarcode(result.getText())) seen();
-    });
-    return { hit, stats, stop: () => controls.stop() };
-  }
-  const detector = decoder === 'native' ? new BarcodeDetector({ formats: ['ean_13'] }) : await wasmDetector();
-  (async () => {
-    while (active) {
-      const began = performance.now();
-      const codes = await detector.detect(video).catch(() => []);
-      stats.detectMs.push(performance.now() - began);
-      stats.attempts += 1;
-      if (codes.some((code) => isbnFromBarcode(code.rawValue))) seen();
-      await sleep(delay);
-    }
-  })();
-  return { hit, stats, stop: () => { active = false; } };
+  const { BrowserMultiFormatOneDReader } = await loadZxing();
+  const reader = new BrowserMultiFormatOneDReader(undefined, { delayBetweenScanAttempts: delay, delayBetweenScanSuccess: delay });
+  const controls = await reader.decodeFromVideoElement(video, (result) => {
+    stats.attempts += 1;
+    if (result && isbnFromBarcode(result.getText())) seen();
+  });
+  return { hit, stats, stop: () => controls.stop() };
 }
 
 async function openCamera(constraints) {
@@ -111,9 +83,6 @@ async function run(name, note, hold) {
   let stream;
   let decoder;
   try {
-    const prepared = performance.now();
-    if (config.decoder === 'wasm') await wasmDetector();
-    row.prepMs = Math.round(performance.now() - prepared);
     const started = performance.now();
     stream = await Promise.race([openCamera(config.video), timeout(CAMERA_TIMEOUT_MS, 'the camera did not start')]);
     row.cameraMs = Math.round(performance.now() - started);
@@ -126,7 +95,6 @@ async function run(name, note, hold) {
     row.perSecond = hold ? +(decoder.stats.attempts / (HOLD_MS / 1000)).toFixed(1) : null;
     row.hitPercent = hold && decoder.stats.attempts ? Math.round((100 * decoder.stats.hits) / decoder.stats.attempts) : null;
     row.attempts = decoder.stats.attempts;
-    row.detectMs = decoder.stats.detectMs.length ? Math.round(median(decoder.stats.detectMs)) : null;
     const settings = stream.getVideoTracks()[0]?.getSettings() ?? {};
     row.size = `${settings.width}x${settings.height}`;
     row.focus = settings.focusMode ?? 'n/a';
@@ -140,7 +108,7 @@ async function run(name, note, hold) {
 }
 
 function report() {
-  const lines = ['config | note | mode | runs | found | median ms to decode | frames decoded % | frames/s | detect ms | camera start ms | size | focus | prep ms (first run)'];
+  const lines = ['config | note | mode | runs | found | median ms to decode | frames decoded % | frames/s | camera start ms | size | focus'];
   const groups = new Map();
   for (const r of runs) {
     const key = `${r.name}\u0000${r.note}\u0000${Boolean(r.hold)}`;
@@ -152,8 +120,8 @@ function report() {
     const failed = mine.length - good.length;
     const of = (field) => median(good.map((r) => r[field]).filter((x) => x !== null && x !== undefined));
     lines.push([mine[0].name, mine[0].note || '-', mine[0].hold ? 'hold 5 s' : 'first hit', `${mine.length}${failed ? ` (${failed} camera errors)` : ''}`, `${ok.length}/${good.length}`,
-      mine[0].hold ? '-' : median(ok.map((r) => r.decodeMs)), of('hitPercent'), of('perSecond'), of('detectMs'),
-      median(good.map((r) => r.cameraMs)), good[0]?.size ?? '-', good[0]?.focus ?? '-', mine[0].prepMs ?? '-'].join(' | '));
+      mine[0].hold ? '-' : median(ok.map((r) => r.decodeMs)), of('hitPercent'), of('perSecond'),
+      median(good.map((r) => r.cameraMs)), good[0]?.size ?? '-', good[0]?.focus ?? '-'].join(' | '));
   }
   const last = runs.at(-1);
   $('out').textContent = `${lines.join('\n')}\n\nUA: ${navigator.userAgent}${last?.error ? `\nLast run failed: ${last.error}` : ''}`;
