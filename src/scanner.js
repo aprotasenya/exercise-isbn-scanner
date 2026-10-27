@@ -24,6 +24,14 @@ export function createDedupe(ms, now = Date.now) {
 // 100 ms in ~240 ms, but 100 ms felt too fast on a phone, so this is the middle.
 const SCAN_INTERVAL_MS = 250;
 
+// The preview is for aiming, not for watching: at most this many pictures a second are drawn, however fast the camera
+// (a phone set to 90 or 120 fps) or the screen is.
+const PREVIEW_FPS = 30;
+
+// A scan that finishes sooner than this after the first picture appears waits for the rest, so the camera does not
+// flash open and shut on a fast read. Only a single scan waits: in a series the camera stays on anyway.
+const MIN_SCAN_MS = 300;
+
 // Without constraints a phone gives a 480x640 picture, in which a barcode in dim light often does not decode (bench.html on an
 // iPhone 13: 9 of 13 found, against 81 of 81 at 1080x1920). All are `ideal`, so a camera that can't do them still starts.
 const VIDEO = { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] };
@@ -58,16 +66,30 @@ export function coverRect(w, h, cw, ch) {
   return [(w - sw) / 2, (h - sh) / 2, sw, sh];
 }
 
+// Says for each frame (its time in ms) whether to draw it, so that about `fps` a second are drawn from a source of any speed. The next
+// frame is due one step after the last one was due, not after it was drawn: from a 30 fps camera this draws 4 of every 5 frames, not every 2nd.
+export function frameGate(fps) {
+  const step = 1000 / fps;
+  let due = 0;
+  return (now) => {
+    if (now < due) return false;
+    due = now - due > step ? now + step : due + step; // after a pause (or a slow source) start afresh: no backlog to catch up on
+    return true;
+  };
+}
+
 // Shows what `video` plays in `canvas`, cropped to fill it, one drawing per new frame. The <video> element itself is
 // not shown: an iPhone lays it out late (the picture first at its own size, then fitted to the box), and here every
 // frame is fitted to the box before it is drawn. Returns a function that stops the drawing and clears the picture.
-export function drawPreview(video, canvas) {
+export function drawPreview(video, canvas, onFirstFrame = () => {}) {
   const context = canvas.getContext('2d');
+  const wanted = frameGate(PREVIEW_FPS);
   let stopped = false;
+  let first = true;
   const next = () => (video.requestVideoFrameCallback ? video.requestVideoFrameCallback(draw) : requestAnimationFrame(draw));
   function draw() {
     if (stopped) return;
-    if (video.videoWidth && video.videoHeight) {
+    if (video.videoWidth && video.videoHeight && wanted(performance.now())) {
       const box = canvas.getBoundingClientRect();
       const scale = Math.min(globalThis.devicePixelRatio || 1, 2); // enough sharpness for a preview, and fewer pixels to draw
       const width = Math.round(box.width * scale);
@@ -77,6 +99,8 @@ export function drawPreview(video, canvas) {
         canvas.height = height;
       }
       context.drawImage(video, ...coverRect(video.videoWidth, video.videoHeight, width, height), 0, 0, width, height);
+      if (first) onFirstFrame();
+      first = false;
     }
     next();
   }
@@ -95,6 +119,8 @@ export async function startScanner(video, { canvas, onIsbn, onUnrecognized, onRe
   const { BrowserMultiFormatOneDReader } = await loadZxing();
   const reader = new BrowserMultiFormatOneDReader(undefined, { delayBetweenScanAttempts: SCAN_INTERVAL_MS });
   let done = false;
+  let shownAt = null; // when the first picture appeared
+  let waiting = null; // the timer of a scan that waits for MIN_SCAN_MS
   const isDuplicate = createDedupe(3000);
   const controls = await reader.decodeFromConstraints({ video: VIDEO }, video, (result) => {
     // Called for every frame; `result` is only set when a barcode was decoded.
@@ -105,14 +131,15 @@ export async function startScanner(video, { canvas, onIsbn, onUnrecognized, onRe
       else onIsbn(isbn);
     } else if (isbn) {
       done = true;
-      onIsbn(isbn);
+      waiting = setTimeout(() => onIsbn(isbn), Math.max(0, MIN_SCAN_MS - (shownAt === null ? 0 : Date.now() - shownAt)));
     } else {
       onUnrecognized();
     }
   });
-  const stopDrawing = canvas ? drawPreview(video, canvas) : () => {};
+  const stopDrawing = canvas ? drawPreview(video, canvas, () => { shownAt = Date.now(); }) : () => {};
   return () => {
     done = true;
+    clearTimeout(waiting);
     stopDrawing();
     controls.stop();
   };

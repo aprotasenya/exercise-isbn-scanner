@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coverRect, createDedupe, isbnFromBarcode, loadZxing } from '../src/scanner.js';
+import { coverRect, createDedupe, frameGate, isbnFromBarcode, loadZxing } from '../src/scanner.js';
 
 test('accepts book EAN-13 barcodes (978 and 979)', () => {
   assert.equal(isbnFromBarcode('9780747532699'), '9780747532699');
@@ -93,4 +93,24 @@ test('coverRect crops a picture to fill a box without stretching, from the cente
   assert.deepEqual(coverRect(1080, 1920, 400, 300), [0, 555, 1080, 810]); // a portrait picture in a 4:3 box: a band across the middle
   assert.deepEqual(coverRect(1920, 1080, 300, 400), [555, 0, 810, 1080]); // a landscape one in a portrait box: a band down the middle
   assert.deepEqual(coverRect(640, 480, 400, 300), [0, 0, 640, 480]); // the same shape: all of it
+});
+
+test('frameGate draws about the wanted number of frames a second from a camera of any speed', () => {
+  const drawn = (sourceFps) => {
+    const ready = frameGate(24);
+    let count = 0;
+    for (let t = 0; t < 10000; t += 1000 / sourceFps) if (ready(t)) count++;
+    return count / 10;
+  };
+  assert.ok(Math.abs(drawn(30) - 24) <= 1.5, `30 fps source: ${drawn(30)}`);
+  assert.ok(Math.abs(drawn(60) - 24) <= 1.5, `60 fps source: ${drawn(60)}`);
+  assert.ok(Math.abs(drawn(120) - 24) <= 1.5, `120 fps source: ${drawn(120)}`);
+  assert.ok(drawn(15) >= 14.9, `15 fps source: ${drawn(15)}`); // a slower source is never held back
+});
+
+test('frameGate does not hurry after a pause', () => {
+  const ready = frameGate(24);
+  assert.equal(ready(0), true);
+  assert.equal(ready(5000), true); // a long pause...
+  assert.equal(ready(5010), false); // ...is not followed by a burst of frames
 });
