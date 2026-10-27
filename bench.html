@@ -10,11 +10,12 @@
   pre { white-space: pre-wrap; font-size: 13px }
 </style>
 <h1>Scanner bench</h1>
-<p>Hold the same book at the same distance in the same light. Press Run, the run ends at the first book barcode (or after 15 s). Do 10 runs per config. The note (light, distance) splits the table into rows. Results stay after a reload.</p>
+<p>Hold the same book at the same distance in the same light. Press Run, the run ends at the first book barcode (or after 15 s). Do 10 runs per config. The note (light, distance) splits the table into rows. Results stay after a reload. With "hold 5 s" the barcode stays in view and every config decodes as fast as it can for 5 s: that gives the share of frames that decoded and the real frames per second, which does not depend on how fast you bring the book in.</p>
 <video id="v" playsinline muted></video>
 <p>
   <select id="cfg"></select>
   <input id="note" placeholder="note: dim, 20 cm" size="14">
+  <label><input type="checkbox" id="hold"> hold 5 s</label>
   <button id="run">Run</button>
   <button id="copy">Copy results</button>
   <button id="clear">Clear</button>

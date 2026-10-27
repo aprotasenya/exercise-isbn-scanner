@@ -24,6 +24,10 @@ export function createDedupe(ms, now = Date.now) {
 // 100 ms in ~240 ms, but 100 ms felt too fast on a phone, so this is the middle.
 const SCAN_INTERVAL_MS = 250;
 
+// Without constraints a phone gives a 480x640 picture, in which a barcode in dim light often does not decode (bench.html on an
+// iPhone 13: 9 of 13 found, against 81 of 81 at 1080x1920). All are `ideal`, so a camera that can't do them still starts.
+const VIDEO = { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] };
+
 let zxingLoaded;
 
 // The barcode library is large, so it is only fetched when scanning is first requested.
@@ -55,7 +59,7 @@ export async function startScanner(video, { onIsbn, onUnrecognized, onRepeat, co
   const reader = new BrowserMultiFormatOneDReader(undefined, { delayBetweenScanAttempts: SCAN_INTERVAL_MS });
   let done = false;
   const isDuplicate = createDedupe(3000);
-  const controls = await reader.decodeFromVideoDevice(undefined, video, (result) => {
+  const controls = await reader.decodeFromConstraints({ video: VIDEO }, video, (result) => {
     // Called for every frame; `result` is only set when a barcode was decoded.
     if (!result || done) return;
     const isbn = isbnFromBarcode(result.getText());

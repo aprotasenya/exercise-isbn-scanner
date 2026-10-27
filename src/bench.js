@@ -10,6 +10,8 @@ const KEY = 'isbn-reader.bench';
 const HD = { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } };
 const FOCUSED = { ...HD, advanced: [{ focusMode: 'continuous' }] };
 
+const HOLD_MS = 5000; // "hold" mode: the barcode stays in view and every frame the decoder can take is counted
+
 // A is what the app did before; each next config changes one thing. `decoder`: zxing = the JS port in the app,
 // native = the browser's own BarcodeDetector (Chrome/Android), wasm = zxing-cpp in WebAssembly (vendor/barcode-detector.js).
 const CONFIGS = {
@@ -58,30 +60,33 @@ async function wasmDetector() {
 
 // Starts decoding `video` with the config's decoder. Returns { hit, stop, stats }: `hit` settles with the time of the first book barcode.
 async function startDecoder({ decoder, delay }) {
-  const stats = { attempts: 0, detectMs: [] };
+  const stats = { attempts: 0, hits: 0, detectMs: [] };
   let active = true;
+  let found;
+  const hit = new Promise((resolve) => { found = resolve; }); // the time of the first book barcode
+  const seen = () => {
+    stats.hits += 1;
+    if (stats.hits === 1) found(performance.now());
+  };
   if (decoder === 'zxing') {
     const { BrowserMultiFormatOneDReader } = await loadZxing();
-    const reader = new BrowserMultiFormatOneDReader(undefined, { delayBetweenScanAttempts: delay });
-    let found;
-    const hit = new Promise((resolve) => { found = resolve; });
+    const reader = new BrowserMultiFormatOneDReader(undefined, { delayBetweenScanAttempts: delay, delayBetweenScanSuccess: delay });
     const controls = await reader.decodeFromVideoElement(video, (result) => {
       stats.attempts += 1;
-      if (result && isbnFromBarcode(result.getText())) found(performance.now());
+      if (result && isbnFromBarcode(result.getText())) seen();
     });
     return { hit, stats, stop: () => controls.stop() };
   }
   const detector = decoder === 'native' ? new BarcodeDetector({ formats: ['ean_13'] }) : await wasmDetector();
-  const hit = (async () => {
+  (async () => {
     while (active) {
       const began = performance.now();
       const codes = await detector.detect(video).catch(() => []);
       stats.detectMs.push(performance.now() - began);
       stats.attempts += 1;
-      if (codes.some((code) => isbnFromBarcode(code.rawValue))) return performance.now();
+      if (codes.some((code) => isbnFromBarcode(code.rawValue))) seen();
       await sleep(delay);
     }
-    return null;
   })();
   return { hit, stats, stop: () => { active = false; } };
 }
@@ -100,9 +105,9 @@ function closeCamera(stream) {
 
 const median = (xs) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.floor((xs.length - 1) / 2)] : '-');
 
-async function run(name, note) {
-  const config = CONFIGS[name];
-  const row = { name, note, ok: false };
+async function run(name, note, hold) {
+  const config = hold ? { ...CONFIGS[name], delay: 0 } : CONFIGS[name]; // hold: no pause between frames, to see what the decoder can do
+  const row = { name, note, hold, ok: false };
   let stream;
   let decoder;
   try {
@@ -114,10 +119,13 @@ async function run(name, note) {
     row.cameraMs = Math.round(performance.now() - started);
     const playing = performance.now();
     decoder = await startDecoder(config);
-    const hitAt = await Promise.race([decoder.hit, sleep(TIMEOUT_MS).then(() => null)]);
+    const hitAt = hold ? (await sleep(HOLD_MS), decoder.stats.hits ? 1 : null) : await Promise.race([decoder.hit, sleep(TIMEOUT_MS).then(() => null)]);
     row.ok = hitAt !== null;
-    row.decodeMs = row.ok ? Math.round(hitAt - playing) : null;
-    row.perSecond = +(decoder.stats.attempts / (((hitAt ?? performance.now()) - playing) / 1000)).toFixed(1);
+    row.decodeMs = row.ok && !hold ? Math.round(hitAt - playing) : null;
+    // a run that ends after a single attempt has no rate to speak of, so only a hold gives one
+    row.perSecond = hold ? +(decoder.stats.attempts / (HOLD_MS / 1000)).toFixed(1) : null;
+    row.hitPercent = hold && decoder.stats.attempts ? Math.round((100 * decoder.stats.hits) / decoder.stats.attempts) : null;
+    row.attempts = decoder.stats.attempts;
     row.detectMs = decoder.stats.detectMs.length ? Math.round(median(decoder.stats.detectMs)) : null;
     const settings = stream.getVideoTracks()[0]?.getSettings() ?? {};
     row.size = `${settings.width}x${settings.height}`;
@@ -132,18 +140,19 @@ async function run(name, note) {
 }
 
 function report() {
-  const lines = ['config | note | runs | found | median ms to decode | attempts/s | detect ms | camera start ms | size | focus | prep ms (first run)'];
+  const lines = ['config | note | mode | runs | found | median ms to decode | frames decoded % | frames/s | detect ms | camera start ms | size | focus | prep ms (first run)'];
   const groups = new Map();
   for (const r of runs) {
-    const key = `${r.name}\u0000${r.note}`;
+    const key = `${r.name}\u0000${r.note}\u0000${Boolean(r.hold)}`;
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
   for (const mine of groups.values()) {
     const good = mine.filter((r) => !r.error);
     const ok = good.filter((r) => r.ok);
     const failed = mine.length - good.length;
-    lines.push([mine[0].name, mine[0].note || '-', `${mine.length}${failed ? ` (${failed} camera errors)` : ''}`, `${ok.length}/${good.length}`,
-      median(ok.map((r) => r.decodeMs)), median(good.map((r) => r.perSecond)), median(good.map((r) => r.detectMs).filter((x) => x !== null)),
+    const of = (field) => median(good.map((r) => r[field]).filter((x) => x !== null && x !== undefined));
+    lines.push([mine[0].name, mine[0].note || '-', mine[0].hold ? 'hold 5 s' : 'first hit', `${mine.length}${failed ? ` (${failed} camera errors)` : ''}`, `${ok.length}/${good.length}`,
+      mine[0].hold ? '-' : median(ok.map((r) => r.decodeMs)), of('hitPercent'), of('perSecond'), of('detectMs'),
       median(good.map((r) => r.cameraMs)), good[0]?.size ?? '-', good[0]?.focus ?? '-', mine[0].prepMs ?? '-'].join(' | '));
   }
   const last = runs.at(-1);
@@ -153,12 +162,14 @@ function report() {
 $('run').onclick = async () => {
   $('run').disabled = true;
   $('cfg').disabled = true;
-  runs.push(await run($('cfg').value, $('note').value.trim().slice(0, 30)));
+  $('hold').disabled = true;
+  runs.push(await run($('cfg').value, $('note').value.trim().slice(0, 30), $('hold').checked));
   save();
   report();
   await sleep(COOLDOWN_MS);
   $('run').disabled = false;
   $('cfg').disabled = false;
+  $('hold').disabled = false;
 };
 $('copy').onclick = () => navigator.clipboard?.writeText($('out').textContent);
 $('clear').onclick = () => {
