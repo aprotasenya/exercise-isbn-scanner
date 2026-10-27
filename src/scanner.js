@@ -115,8 +115,8 @@ export function drawPreview(video, canvas, onFirstFrame = () => {}) {
 // By default the first book ISBN ends the scan; with `continuous`, `onIsbn` keeps firing
 // for each newly seen book and `onRepeat` for every further sighting of a book still in view. Rejects if the library cannot load or the camera is
 // denied/unavailable.
-export async function startScanner(video, { canvas, onIsbn, onUnrecognized, onRepeat, continuous = false }) {
-  const { BrowserMultiFormatOneDReader } = await loadZxing();
+export async function startScanner(video, { canvas, onIsbn, onUnrecognized, onRepeat, continuous = false, zxing }) {
+  const { BrowserMultiFormatOneDReader } = zxing ?? await loadZxing(); // `zxing`: a stand-in for the library, in tests
   const reader = new BrowserMultiFormatOneDReader(undefined, { delayBetweenScanAttempts: SCAN_INTERVAL_MS });
   let done = false;
   let shownAt = null; // when the first picture appeared

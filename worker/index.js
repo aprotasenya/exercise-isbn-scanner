@@ -6,7 +6,7 @@
 // Runs as a Cloudflare Worker, see README.md in this folder.
 import { isValidIsbn, normalizeIsbn } from '../src/isbn.js';
 import { parseBook, parseCandidates, parseEdition } from './goodreads.js';
-import { MAX_BYTES as MAX_EVENT_BYTES, cleanBatch, saveBatch } from './events.js';
+import { MAX_BYTES as MAX_EVENT_BYTES, cleanBatch, pruneEvents, saveBatch } from './events.js';
 
 export const ALLOWED_ORIGINS = ['https://oleprota.github.io', 'http://localhost:8000'];
 const FOUND_SECONDS = 7 * 24 * 3600;
@@ -101,7 +101,9 @@ const json = (body, status, seconds, extra = {}) =>
 // Usage events: dropped silently without a database (DB is optional, like the limiter), saved after the answer is sent.
 async function record(request, env, ctx, cors) {
   if (request.method !== 'POST') return json({}, 404, 0, cors);
-  if (Number(request.headers.get('content-length')) > MAX_EVENT_BYTES) return json({ error: 'too big' }, 413, 0, cors);
+  // a body without a length (streamed) would be read whole before it could be refused; sendBeacon always sends the length
+  const length = Number(request.headers.get('content-length'));
+  if (!(length > 0 && length <= MAX_EVENT_BYTES)) return json({ error: 'too big' }, 413, 0, cors);
   const limited = await env.EVENT_LIMITER?.limit({ key: request.headers.get('cf-connecting-ip') ?? 'anonymous' });
   if (limited && !limited.success) return json({ error: 'slow down' }, 429, 0, cors);
   const batch = cleanBatch(await request.text());
@@ -173,5 +175,9 @@ export default {
   fetch: (request, env, ctx) => {
     const handle = createHandler({ fetchFn: fetch, cache: caches.default });
     return handle(request, env, ctx);
+  },
+  // the daily job in wrangler.toml: the usage events do not grow for ever
+  scheduled: (event, env, ctx) => {
+    if (env.DB) ctx.waitUntil(pruneEvents(env.DB).catch(() => {}));
   },
 };

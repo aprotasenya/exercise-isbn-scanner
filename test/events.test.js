@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanBatch } from '../worker/events.js';
-import { createHandler } from '../worker/index.js';
+import { KEEP_DAYS, cleanBatch, pruneEvents, saveBatch } from '../worker/events.js';
+import worker, { createHandler } from '../worker/index.js';
 
 const ID = 'a1b2c3d4';
 const NOW = 1_000_000_000;
@@ -45,7 +45,8 @@ const handle = createHandler({ fetchFn: async () => { throw new Error('no networ
 const ORIGIN = 'https://oleprota.github.io';
 const post = (text, env, { origin = ORIGIN, method = 'POST' } = {}) => {
   const waiting = [];
-  const request = new Request('https://worker.test/event', { method, headers: origin ? { origin } : {}, body: method === 'POST' ? text : undefined });
+  const headers = { ...(origin && { origin }), ...(method === 'POST' && { 'content-length': String(Buffer.byteLength(text)) }) }; // a browser's beacon always has its length
+  const request = new Request('https://worker.test/event', { method, headers, body: method === 'POST' ? text : undefined });
   return handle(request, env, { waitUntil: (p) => waiting.push(p) }).then(async (response) => { await Promise.all(waiting); return response; });
 };
 const fakeDb = () => {
@@ -67,6 +68,22 @@ test('without a database the events are dropped, and a failing database does not
   assert.equal((await post(body([{ name: 'star', on: 1 }]), { DB })).status, 204);
 });
 
+test('POST /event refuses a body without a length or over the limit before reading it', async () => {
+  const DB = fakeDb();
+  let read = false;
+  const streamed = new Request('https://worker.test/event', {
+    method: 'POST',
+    headers: { origin: ORIGIN },
+    body: new ReadableStream({ pull(controller) { read = true; controller.enqueue(new TextEncoder().encode('x')); controller.close(); } }, { highWaterMark: 0 }), // asked for nothing until someone reads
+    duplex: 'half',
+  });
+  assert.equal(streamed.headers.get('content-length'), null);
+  assert.equal((await handle(streamed, { DB })).status, 413);
+  assert.equal(read, false);
+  assert.equal((await post('x'.repeat(5000), { DB })).status, 413);
+  assert.equal(DB.inserted.length, 0);
+});
+
 test('POST /event refuses a bad batch, a strange origin, GET and a busy address', async () => {
   const DB = fakeDb();
   assert.equal((await post('nope', { DB })).status, 400);
@@ -75,4 +92,26 @@ test('POST /event refuses a bad batch, a strange origin, GET and a busy address'
   const busy = { EVENT_LIMITER: { limit: async () => ({ success: false }) } };
   assert.equal((await post(body([{ name: 'star' }]), { DB, ...busy })).status, 429);
   assert.equal(DB.inserted.length, 0);
+});
+
+test('a broken database binding does not fail the request (the save rejects instead of throwing)', async () => {
+  const DB = { prepare() { throw new Error('no such binding'); } };
+  await assert.rejects(saveBatch(DB, { id: ID, dev: 0, rows: [] }), /no such binding/);
+  assert.equal((await post(body([{ name: 'star', on: 1 }]), { DB })).status, 204);
+});
+
+test('the daily job deletes events older than 90 days, and does nothing without a database', async () => {
+  const run = [];
+  const DB = { prepare: (sql) => ({ bind: (...args) => ({ run: async () => { run.push([sql, ...args]); } }) }) };
+  const now = 1_700_000_000_000;
+  await pruneEvents(DB, now);
+  assert.deepEqual(run, [['DELETE FROM events WHERE ts < ?', now - KEEP_DAYS * 86400_000]]);
+  assert.equal(KEEP_DAYS, 90);
+
+  const waiting = [];
+  worker.scheduled({}, { DB }, { waitUntil: (p) => waiting.push(p) });
+  worker.scheduled({}, {}, { waitUntil: (p) => waiting.push(p) });
+  await Promise.all(waiting);
+  assert.equal(run.length, 2); // one run from the job with a database, none without
+  assert.equal(waiting.length, 1);
 });

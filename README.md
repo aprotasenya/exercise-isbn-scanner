@@ -10,6 +10,8 @@ Every ISBN you search or scan goes into the **Шукане** ("Scanned") list. P
 
 Press **Scan** to read the ISBN from a book's barcode with the camera (needs camera permission and `localhost` or https); tap it to scan one book, or hold it for a moment (it fills with red) to keep the camera on for several books until you press Stop. A beep and a flash confirm each read (amber for a new book, blue for one already scanned). Typing the ISBN always works too.
 
+**Usage counts.** The app sends anonymous usage counts to the same lookup service (`POST /event`, kept in a small D1 database, see `worker/README.md`): which browser and device kind, whether the camera worked and how long a scan took, how the lookup answered, which features were used. Never an ISBN, title or name. Your browser gets a random id (shown at the bottom of the page) to count returning visitors; nothing else identifies you. A browser that sends Do Not Track sends nothing. The developer's own use is flagged by opening the page once with `#dev` (`#nodev` undoes it), so it can be left out of the counts.
+
 ## Run
 ES modules don't load over `file://`, so use a static server:
 

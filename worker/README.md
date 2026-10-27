@@ -11,7 +11,7 @@ A tiny Cloudflare Worker with three read paths and one for usage stats (`POST /e
 
 ## Usage stats (optional)
 
-`POST /event` takes a batch of anonymous usage events from the app (`src/stats.js`) and keeps them in a D1 database (Cloudflare's free SQLite). Which events and fields are allowed is in `events.js`; anything else is dropped, and a body over 4 KB or an address past 30 batches a minute (`EVENT_LIMITER`) is refused. Without the database the endpoint answers 204 and drops the events, so nothing else depends on it. Set it up once:
+`POST /event` takes a batch of anonymous usage events from the app (`src/stats.js`) and keeps them in a D1 database (Cloudflare's free SQLite). Which events and fields are allowed is in `events.js`; anything else is dropped, and a body over 4 KB or an address past 10 batches a minute (`EVENT_LIMITER`) is refused. A daily job (`scheduled` in `index.js`, the cron in `wrangler.toml`) deletes events older than 90 days. Without the database the endpoint answers 204 and drops the events, so nothing else depends on it. Set it up once:
 
     cd worker
     npx wrangler d1 create isbn-stats          # prints a database_id
@@ -23,7 +23,6 @@ Read it (every row has `dev`: 1 is the developer's own use, leave it out):
 
     npx wrangler d1 execute isbn-stats --remote --command "SELECT json_extract(data,'$.os') os, json_extract(data,'$.browser') browser, COUNT(DISTINCT id) users FROM events WHERE name='session' AND dev=0 GROUP BY 1,2"
     npx wrangler d1 execute isbn-stats --remote --command "SELECT json_extract(data,'$.result') result, COUNT(*) n, CAST(AVG(json_extract(data,'$.ms')) AS INT) avg_ms FROM events WHERE name='lookup' AND dev=0 GROUP BY 1"
-    npx wrangler d1 execute isbn-stats --remote --command "DELETE FROM events WHERE ts < (strftime('%s','now') - 90*86400) * 1000"   # drop rows older than 90 days
 
 ## Deploy (once)
 

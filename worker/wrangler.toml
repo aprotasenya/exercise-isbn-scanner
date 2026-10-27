@@ -11,13 +11,14 @@ namespace_id = "1001"
   limit = 20
   period = 10
 
-# At most 30 usage-event batches per minute from one address.
+# At most 10 usage-event batches per minute from one address (a session sends one to five; one address can then write at most
+# 200 rows a minute, which is about 5 hours of the free plan's 100,000 row writes a day).
 [[ratelimits]]
 name = "EVENT_LIMITER"
 namespace_id = "1002"
 
   [ratelimits.simple]
-  limit = 30
+  limit = 10
   period = 60
 
 # Usage events are kept in D1 (see README.md for the three commands that make it); without it POST /event just drops them.
@@ -28,3 +29,7 @@ database_id = "46341b98-5fac-468c-816c-82cbf826549c"
 
 [observability]
 enabled = true
+
+# Once a day, usage events older than 90 days are deleted (KEEP_DAYS in events.js).
+[triggers]
+crons = ["17 3 * * *"]

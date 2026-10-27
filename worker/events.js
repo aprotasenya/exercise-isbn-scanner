@@ -48,7 +48,11 @@ export function cleanBatch(text, now = Date.now()) {
   return { id: body.id, dev: body.dev === 1 ? 1 : 0, rows };
 }
 
-export const saveBatch = (db, { id, dev, rows }) => {
+export const saveBatch = async (db, { id, dev, rows }) => {
   const insert = db.prepare('INSERT INTO events (ts, id, dev, name, data) VALUES (?, ?, ?, ?, ?)');
   return db.batch(rows.map((row) => insert.bind(row.ts, id, dev, row.name, row.data)));
 };
+
+// Rows older than this are deleted by the daily job (`scheduled` in index.js, `[triggers]` in wrangler.toml).
+export const KEEP_DAYS = 90;
+export const pruneEvents = (db, now = Date.now()) => db.prepare('DELETE FROM events WHERE ts < ?').bind(now - KEEP_DAYS * 86400_000).run();

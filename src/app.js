@@ -104,26 +104,29 @@ const markToggle = createMarkToggle({
   onFull: () => warnFull('marked', marked),
   onToggle: (on) => stats.track('star', { on: on ? 1 : 0 }),
 });
-const scannedView = createListView({
-  list: scanned,
-  confirmClear: t.clearScanned,
-  rowButton: (book) => markToggle.create(book, book.isbn),
+// What the two lists share; `name` is the list's name in the page, in the stored sort order and in the usage stats.
+const listView = (name, list, own) => createListView({
+  list,
   onOpen: openBook,
   onChange: renderLists,
   isWaiting: (isbn) => pending.has(isbn),
   ratings: meta.ratings,
   foundBy: foundBy.all,
-  sortMode: loadSort(browserStorage(), 'scanned'),
+  sortMode: loadSort(browserStorage(), name),
   onSort: (mode) => {
-    saveSort(browserStorage(), 'scanned', mode);
-    stats.track('sort', { list: 'scanned', mode });
+    saveSort(browserStorage(), name, mode);
+    stats.track('sort', { list: name, mode });
   },
-  onCopy: (ok) => stats.track('copy', { list: 'scanned', ok: ok ? 1 : 0 }),
+  onCopy: (ok) => stats.track('copy', { list: name, ok: ok ? 1 : 0 }),
   notify: (text, isError) => setStatus(text, isError, isError ? 0 : NOTE_MS),
-  elements: listElements('scanned'),
+  elements: listElements(name),
+  ...own,
 });
-const markedView = createListView({
-  list: marked,
+const scannedView = listView('scanned', scanned, {
+  confirmClear: t.clearScanned,
+  rowButton: (book) => markToggle.create(book, book.isbn),
+});
+const markedView = listView('marked', marked, {
   confirmClear: t.clearMarked,
   rowButton: (book) => {
     const remove = iconButton('✕', t.unmark);
@@ -134,19 +137,6 @@ const markedView = createListView({
     });
     return remove;
   },
-  onOpen: openBook,
-  onChange: renderLists,
-  isWaiting: (isbn) => pending.has(isbn),
-  ratings: meta.ratings,
-  foundBy: foundBy.all,
-  sortMode: loadSort(browserStorage(), 'marked'),
-  onSort: (mode) => {
-    saveSort(browserStorage(), 'marked', mode);
-    stats.track('sort', { list: 'marked', mode });
-  },
-  onCopy: (ok) => stats.track('copy', { list: 'marked', ok: ok ? 1 : 0 }),
-  notify: (text, isError) => setStatus(text, isError, isError ? 0 : NOTE_MS),
-  elements: listElements('marked'),
 });
 
 // `ttl`: the message clears itself after that many ms unless another one replaces it first.

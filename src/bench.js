@@ -97,7 +97,6 @@ async function run(name, note, hold) {
     // a run that ends after a single attempt has no rate to speak of, so only a hold gives one
     row.perSecond = hold ? +(decoder.stats.attempts / (HOLD_MS / 1000)).toFixed(1) : null;
     row.hitPercent = hold && decoder.stats.attempts ? Math.round((100 * decoder.stats.hits) / decoder.stats.attempts) : null;
-    row.attempts = decoder.stats.attempts;
     const settings = stream.getVideoTracks()[0]?.getSettings() ?? {};
     row.size = `${settings.width}x${settings.height}`;
     row.focus = settings.focusMode ?? 'n/a';
