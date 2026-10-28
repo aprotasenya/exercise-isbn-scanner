@@ -8,7 +8,7 @@ Minimal web page: enter or scan (camera) an ISBN, or type a title, get a card wi
 - Lookup service: `worker/` (Cloudflare Worker, deploy steps in `worker/README.md`); its address goes in `LOOKUP_URL` in `src/lookup.js`, empty = lookup off
 - Tests and browser checks that need several ISBNs use `test/fixtures/isbns.json` (valid real ISBNs and invalid ones); add new ones there instead of inventing them
 - Verify UI changes in a real browser with `/verify-app` (needs the Playwright MCP from `.mcp.json`)
-- Hook (`.claude/settings.json`): after edits to JS in `src/` or `test/`, `node --check` and `npm test` run automatically; a failure is reported back (exit code 2)
+- Hook (user-level, `~/.claude/hooks/check-edit.sh`, not in the repo): after edits to JS in `src/` or `test/`, `node --check` and `npm test` run automatically; only failed tests are reported back (exit code 2)
 
 Ideas that are not in the current work go to `BACKLOG.md`.
 
