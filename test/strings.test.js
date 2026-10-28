@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { plural, books, listNames, THEME_LABELS, THEME_NAMES, t } from '../src/strings.js';
+import { readFileSync } from 'node:fs';
+import { plural, books, lists, card, theme, lookup } from '../src/strings.js';
 import { THEMES } from '../src/theme.js';
 
 const forms = ['книга', 'книги', 'книг'];
@@ -19,22 +20,23 @@ test('books() puts the number before the right form', () => {
 });
 
 test('the two lists have their names, used in the messages', () => {
-  assert.deepEqual(listNames, { scanned: 'Шукане', marked: 'Вибране' });
-  assert.equal(t.alreadyScanned('X'), 'Вже в «Шуканому»: X');
-  assert.match(t.listFull('marked', 1000, t.fullAdvice.marked), /«Вибране» заповнений \(1000 книг\)/);
-  assert.match(t.clearScanned('3 книги'), /«Шукане» \(3 книги\)\? Вибране залишиться\.$/);
-  assert.equal(t.copied(books(2)), 'Скопійовано 2 книги до буфера.');
+  assert.equal(lists.names.scanned, 'Шукане');
+  assert.equal(lists.names.marked, 'Вибране');
+  assert.equal(lists.alreadyScanned('X'), 'Вже в «Шуканому»: X');
+  assert.match(lists.listFull('marked', 1000, lists.fullAdvice.marked), /«Вибране» заповнений \(1000 книг\)/);
+  assert.match(lists.clearScanned('3 книги'), /«Шукане» \(3 книги\)\? Вибране залишиться\.$/);
+  assert.equal(lists.copied(books(2)), 'Скопійовано 2 книги до буфера.');
 });
 
 test('a book without a name is titled ISBN <number>', () => {
-  assert.equal(t.isbnTitle('9780747532699'), 'ISBN 9780747532699');
+  assert.equal(card.isbnTitle('9780747532699'), 'ISBN 9780747532699');
 });
 
 test('every theme has a label and a name', () => {
-  for (const theme of THEMES) {
-    assert.ok(THEME_LABELS[theme], theme);
-    assert.ok(THEME_NAMES[theme], theme);
-    assert.match(t.themeAria(theme), /^Тема: /);
+  for (const mode of THEMES) {
+    assert.ok(theme.labels[mode], mode);
+    assert.ok(theme.names[mode], mode);
+    assert.match(theme.aria(mode), /^Тема: /);
   }
 });
 
@@ -44,4 +46,11 @@ test('formatRating shows two decimals and groups the count', async () => {
   assert.equal(value, '4.50');
   assert.equal(count.replace(/\s/g, ' '), '734 385'); // the group separator is a no-break space
   assert.equal(formatRating({ value: 3, count: 12 }).count, '12');
+});
+
+test('every data-s path in index.html resolves to a string', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const paths = [...html.matchAll(/data-s(?:-[\w-]+)?="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(paths.length > 10);
+  for (const path of paths) assert.equal(typeof lookup(path), 'string', path);
 });

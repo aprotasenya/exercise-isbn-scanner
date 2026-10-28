@@ -15,7 +15,9 @@ import { LOOKUP_URL, editionOfBook, lookupBook, searchBooks } from './lookup.js'
 import { createListView, createMarkToggle, iconButton } from './listView.js';
 import { el, linkButton, spinner } from './dom.js';
 import { applyTheme, loadTheme, nextTheme, saveTheme } from './theme.js';
-import { THEME_LABELS, t } from './strings.js';
+import * as str from './strings.js';
+
+str.applyStrings(document);
 
 const form = document.getElementById('search');
 const input = document.getElementById('isbn');
@@ -49,7 +51,7 @@ if (/^#(no)?dev$/.test(location.hash)) history.replaceState(null, '', location.p
 document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && stats.flush());
 window.addEventListener('pagehide', stats.flush);
 const statsNote = document.getElementById('stats-note');
-statsNote.textContent = t.statsNote(stats.id, stats.dev);
+statsNote.textContent = str.page.statsNote(stats.id, stats.dev);
 statsNote.hidden = !stats.enabled;
 
 // "Scanned" is everything searched or scanned; "Marked" is the subset the user picked.
@@ -69,7 +71,7 @@ let warnedList = null;
 
 function warnFull(name, list) {
   warnedList = list;
-  warning.textContent = t.listFull(name, list.limit, t.fullAdvice[name]);
+  warning.textContent = str.lists.listFull(name, list.limit, str.lists.fullAdvice[name]);
   warning.hidden = false;
 }
 
@@ -123,13 +125,13 @@ const listView = (name, list, own) => createListView({
   ...own,
 });
 const scannedView = listView('scanned', scanned, {
-  confirmClear: t.clearScanned,
+  confirmClear: str.lists.clearScanned,
   rowButton: (book) => markToggle.create(book, book.isbn),
 });
 const markedView = listView('marked', marked, {
-  confirmClear: t.clearMarked,
+  confirmClear: str.lists.clearMarked,
   rowButton: (book) => {
-    const remove = iconButton('✕', t.unmark);
+    const remove = iconButton('✕', str.card.unmark);
     remove.addEventListener('click', () => {
       marked.remove(book.isbn);
       stats.track('star', { on: 0 });
@@ -170,7 +172,7 @@ const bookFor = (isbn) => ({ title: titles.of(isbn) });
 function titleHeading(book, isbn, waiting) {
   const heading = el('h2', null, 'book-title');
   const slot = el('span', null, 'title-slot'); // the title button or the editor field
-  const ring = spinner(t.lookingUp);
+  const ring = spinner(str.search.lookingUp);
   heading.append(slot);
   const setWaiting = (on) => (on ? heading.append(ring) : ring.remove());
 
@@ -179,7 +181,7 @@ function titleHeading(book, isbn, waiting) {
   function showTitle(refocus = false) {
     const title = el('button', book.title, 'title-edit');
     title.type = 'button';
-    title.title = t.editName;
+    title.title = str.card.editName;
     title.addEventListener('click', startEditing);
     slot.classList.remove('editing');
     slot.replaceChildren(title);
@@ -206,7 +208,7 @@ function titleHeading(book, isbn, waiting) {
     const initial = book.title; // a title found by the lookup meanwhile is not a change made here
     field.value = initial;
     field.placeholder = fallbackTitle(isbn); // what an empty name turns back into
-    field.setAttribute('aria-label', t.nameLabel);
+    field.setAttribute('aria-label', str.card.nameLabel);
     let finished = false;
     const finish = (keep, refocus) => {
       if (finished) return; // Enter and the blur that follows it must not save twice
@@ -326,7 +328,7 @@ function updateControls() {
   const scanning = !scanner.hidden;
   input.disabled = scanning;
   button.disabled = scanning;
-  scanLabel.textContent = scanning ? t.stop : t.scan;
+  scanLabel.textContent = scanning ? str.scanner.stop : str.scanner.scan;
   scanButton.classList.toggle('stop', scanning);
   scannedView.setLocked(scanning);
   markedView.setLocked(scanning);
@@ -355,7 +357,7 @@ function clearHint() {
   setStatus('');
 }
 
-const showNotBookHint = () => showHint('not-a-book', t.notABook);
+const showNotBookHint = () => showHint('not-a-book', str.search.notABook);
 
 function closeScanner() {
   scanToken++;
@@ -440,7 +442,7 @@ const scannedTitle = (isbn) => scanned.list().find((book) => book.isbn === isbn)
 
 function showAlreadyScanned(isbn) {
   const title = scannedTitle(isbn);
-  if (title) showHint(isbn, t.alreadyScanned(title));
+  if (title) showHint(isbn, str.lists.alreadyScanned(title));
 }
 
 // Every search or scan puts the book at the top of the Scanned list. Returns false when the
@@ -483,9 +485,9 @@ function addScanned(isbn) {
   const book = bookFor(isbn);
   touchRun(isbn, true);
   if (noteScanned(isbn, book.title)) {
-    setStatus(t.added(book.title));
+    setStatus(str.lists.added(book.title));
     requestMeta(isbn);
-  } else setStatus(t.notAdded(book.title), true);
+  } else setStatus(str.lists.notAdded(book.title), true);
 }
 
 async function openScanner(continuous = false) {
@@ -519,7 +521,7 @@ async function openScanner(continuous = false) {
         closeScanner();
         input.value = isbn;
         search(isbn, { via: 'scan' });
-        if (again) setStatus(t.alreadyScanned(bookFor(isbn).title));
+        if (again) setStatus(str.lists.alreadyScanned(bookFor(isbn).title));
       },
       onUnrecognized: showNotBookHint,
       onRepeat: sightedAgain,
@@ -532,7 +534,7 @@ async function openScanner(continuous = false) {
     if (token !== scanToken) return;
     stats.track('scan_fail', { reason: { NotAllowedError: 'denied', SecurityError: 'denied', NotFoundError: 'no_camera', NotReadableError: 'busy' }[err?.name] ?? 'other' });
     closeScanner();
-    setStatus(t.cameraUnavailable, true);
+    setStatus(str.scanner.cameraUnavailable, true);
     input.focus();
   }
 }
@@ -603,13 +605,13 @@ async function searchTitle(text) {
   closeScanner();
   result.replaceChildren();
   clearWarning();
-  setStatus(t.searchingTitle);
+  setStatus(str.search.searchingTitle);
   const found = await searchBooks(text);
   if (token !== pickToken) return;
   stats.track('title_search', { n: found ? found.length : -1 });
-  if (!found) return setStatus(t.searchFailed, true);
-  if (!found.length) return setStatus(t.noTitleResults, true);
-  setStatus(t.pickBook);
+  if (!found) return setStatus(str.search.searchFailed, true);
+  if (!found.length) return setStatus(str.search.noTitleResults, true);
+  setStatus(str.search.pickBook);
   result.replaceChildren(candidateList(found, token));
   input.blur();
 }
@@ -624,11 +626,11 @@ function candidateList(found, token) {
     text.append(el('span', book.title, 'candidate-title'), el('span', book.author, 'candidate-author'));
     pick.append(text);
     pick.addEventListener('click', async () => {
-      setStatus(t.gettingIsbn);
+      setStatus(str.search.gettingIsbn);
       const edition = await editionOfBook(book.id);
       if (token !== pickToken) return;
       stats.track('title_pick', { isbn: edition ? 1 : 0, details: edition?.found ? 1 : 0 });
-      if (!edition) return setStatus(t.noIsbn(book.title), true);
+      if (!edition) return setStatus(str.search.noIsbn(book.title), true);
       if (edition.found) meta.set(edition.isbn, edition.found); // the page already told everything: no second lookup
       input.value = edition.isbn;
       search(edition.isbn, { found: book, via: 'title' });
@@ -648,7 +650,7 @@ function search(isbn, { push = true, move = true, found = null, via = 'typed' } 
   closeScanner();
   result.replaceChildren();
   stats.track('search', { via, ok: isValidIsbn(isbn) ? 1 : 0 });
-  if (!isValidIsbn(isbn)) return setStatus(t.invalidIsbn, true);
+  if (!isValidIsbn(isbn)) return setStatus(str.search.invalidIsbn, true);
   if (move) foundBy.set(isbn, found?.title, found?.author); // a search by ISBN clears the title a book was once found by
   if (push && isbnFromHash(location.hash) !== isbn) history.pushState(null, '', hashForIsbn(isbn));
 
@@ -679,8 +681,8 @@ let theme = loadTheme(browserStorage());
 
 function showTheme() {
   applyTheme(document.documentElement, theme);
-  themeButton.textContent = THEME_LABELS[theme];
-  themeButton.setAttribute('aria-label', t.themeAria(theme));
+  themeButton.textContent = str.theme.labels[theme];
+  themeButton.setAttribute('aria-label', str.theme.aria(theme));
 }
 
 themeButton.addEventListener('click', () => {

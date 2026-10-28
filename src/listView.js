@@ -1,5 +1,5 @@
 import { el, linkButton, spinner } from './dom.js';
-import { books, t } from './strings.js';
+import { books, card, lists, search } from './strings.js';
 import { SORTS, sortBooks } from './sort.js';
 import { isbnLinks } from './links.js';
 
@@ -18,13 +18,13 @@ export function createMarkToggle({ marked, onChange, onFull, onToggle = () => {}
   function sync(button) {
     const isMarked = marked.has(button.dataset.isbn);
     button.textContent = isMarked ? '★' : '☆';
-    button.title = isMarked ? t.isMarked : t.mark;
+    button.title = isMarked ? card.isMarked : card.mark;
     button.setAttribute('aria-pressed', String(isMarked));
   }
   return {
     // `book.title` is read on click, so a rename after the button was made is picked up.
     create(book, isbn) {
-      const button = iconButton('', t.mark);
+      const button = iconButton('', card.mark);
       button.classList.add('mark-toggle');
       button.dataset.isbn = isbn;
       button.addEventListener('click', () => {
@@ -49,7 +49,7 @@ function ratingTag(value) {
   const tag = el('span', null, 'row-rating');
   const star = el('span', '★', 'row-star');
   star.setAttribute('aria-hidden', 'true');
-  tag.append(star, el('span', `${t.ratingLabel}: `, 'sr-only'), value.toFixed(2));
+  tag.append(star, el('span', `${card.ratingLabel}: `, 'sr-only'), value.toFixed(2));
   return tag;
 }
 
@@ -100,7 +100,7 @@ export function createListView({ list, confirmClear, rowButton, onOpen, onChange
       );
       item.append(open);
       // the spinner and the rating share one place; the rating (the star and the value only) comes once the lookup is over
-      if (isWaiting(book.isbn)) item.append(spinner(t.lookingUp));
+      if (isWaiting(book.isbn)) item.append(spinner(search.lookingUp));
       else if (rated.has(book.isbn)) item.append(ratingTag(rated.get(book.isbn)));
       item.append(actions);
       return item;
@@ -109,13 +109,13 @@ export function createListView({ list, confirmClear, rowButton, onOpen, onChange
 
   // The sort button at the right edge of the header, and its menu. A tap outside the menu (or Escape) closes it.
   const header = section.querySelector('summary');
-  const sortButton = iconButton('⇅', t.sortMenu);
+  const sortButton = iconButton('⇅', lists.sortMenu);
   sortButton.classList.add('sort-button');
   const menu = el('div', null, 'sort-menu');
   menu.hidden = true;
   menu.addEventListener('click', (event) => event.preventDefault()); // the menu's padding is part of the <summary> too: a tap there must not toggle the list
   const choices = SORTS.map((mode) => {
-    const choice = el('button', t.sortNames[mode]);
+    const choice = el('button', lists.sortNames[mode]);
     choice.type = 'button';
     choice.addEventListener('click', (event) => {
       event.preventDefault(); // the header is a <summary>: it must not toggle the list
@@ -162,10 +162,10 @@ export function createListView({ list, confirmClear, rowButton, onOpen, onChange
   copy.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(list.toText(ordered(list.list())));
-      notify(t.copied(books(list.list().length)));
+      notify(lists.copied(books(list.list().length)));
       onCopy(true);
     } catch {
-      notify(t.copyFailed, true);
+      notify(lists.copyFailed, true);
       onCopy(false);
     }
   });

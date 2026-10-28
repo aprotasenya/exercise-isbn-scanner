@@ -1,7 +1,7 @@
 // The parts of a book card that come from the lookup: the rating (the accent of the card), and the
 // series and author with links to Goodreads. All text goes in via textContent.
 import { el } from './dom.js';
-import { formatRating, t } from './strings.js';
+import { card, formatRating } from './strings.js';
 import { goodreadsSearch } from './links.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -21,8 +21,8 @@ function starIcon() {
 export function ratingBlock(rating) {
   const { value, count } = formatRating(rating);
   const block = el('p', null, 'rating');
-  block.title = t.ratingTitle(value, count);
-  block.append(starIcon(), el('span', `${t.ratingLabel}: `, 'sr-only'), el('strong', value, 'rating-value'), el('span', `(${count})`, 'rating-count'));
+  block.title = card.ratingTitle(value, count);
+  block.append(starIcon(), el('span', `${card.ratingLabel}: `, 'sr-only'), el('strong', value, 'rating-value'), el('span', `(${count})`, 'rating-count'));
   return block;
 }
 
@@ -43,12 +43,12 @@ export function factsBlock({ series, author }) {
     const value = el('dd');
     value.append(outsideLink(goodreadsSearch(series.name), series.name));
     if (series.number) value.append(el('span', ` #${series.number}`, 'series-number'));
-    facts.append(el('dt', t.seriesLabel), value);
+    facts.append(el('dt', card.seriesLabel), value);
   }
   if (author) {
     const value = el('dd');
     value.append(author.url ? outsideLink(author.url, author.name) : author.name);
-    facts.append(el('dt', t.authorLabel), value);
+    facts.append(el('dt', card.authorLabel), value);
   }
   return facts;
 }

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Сканер ISBN</title>
+  <title data-s="page.title"></title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📚%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
   <!-- Apply a saved light/dark override before first paint, so there is no flash of the wrong theme. -->
@@ -18,45 +18,45 @@
 <body>
   <main>
     <div class="top">
-      <h1>Сканер ISBN</h1>
-      <button type="button" id="theme" title="Тема: як на пристрої, або світла чи темна">🌓 Авто</button>
+      <h1 data-s="page.heading"></h1>
+      <button type="button" id="theme" data-s-title="theme.title"></button>
     </div>
     <form id="search">
-      <input id="isbn" type="text" placeholder="ISBN або назва, напр. 978-0-14-032872-1" autocomplete="off" aria-label="ISBN або назва книги">
-      <button type="submit">Пошук</button>
+      <input id="isbn" type="text" data-s-placeholder="search.placeholder" autocomplete="off" data-s-aria-label="search.label">
+      <button type="submit" data-s="search.submit"></button>
     </form>
     <div id="scanner" hidden>
       <canvas id="view" aria-hidden="true"></canvas>
       <video id="preview" playsinline muted></video>
-      <p class="meta">Наведіть камеру на штрихкод на звороті книги. Не виходить? Зупиніть камеру й введіть ISBN.</p>
+      <p class="meta" data-s="scanner.instructions"></p>
     </div>
     <p id="status" role="status"></p>
     <section id="result"></section>
     <p id="list-warning" class="warning" role="alert" hidden></p>
     <details id="scanned" class="book-list">
-      <summary>Шукане (<span id="scanned-count">0</span>)</summary>
-      <p id="scanned-empty" class="meta">Поки порожньо. Кожен ISBN, який ви шукаєте чи скануєте, з’являється тут; натисніть ☆, щоб вибрати книгу.</p>
+      <summary><span data-s="lists.names.scanned"></span> (<span id="scanned-count">0</span>)</summary>
+      <p id="scanned-empty" class="meta" data-s="lists.empty.scanned"></p>
       <ul id="scanned-list"></ul>
       <div class="list-actions">
-        <button type="button" id="copy-scanned">Копіювати</button>
-        <button type="button" id="clear-scanned">Очистити</button>
+        <button type="button" id="copy-scanned" data-s="lists.copy"></button>
+        <button type="button" id="clear-scanned" data-s="lists.clear"></button>
       </div>
     </details>
     <details id="marked" class="book-list">
-      <summary>Вибране (<span id="marked-count">0</span>)</summary>
-      <p id="marked-empty" class="meta">Нічого не вибрано. Натисніть ☆ на книзі, тут або на її картці.</p>
+      <summary><span data-s="lists.names.marked"></span> (<span id="marked-count">0</span>)</summary>
+      <p id="marked-empty" class="meta" data-s="lists.empty.marked"></p>
       <ul id="marked-list"></ul>
       <div class="list-actions">
-        <button type="button" id="copy-marked">Копіювати</button>
-        <button type="button" id="clear-marked">Очистити</button>
+        <button type="button" id="copy-marked" data-s="lists.copy"></button>
+        <button type="button" id="clear-marked" data-s="lists.clear"></button>
       </div>
     </details>
     <p id="stats-note" class="meta footer" hidden></p>
   </main>
   <div class="scan-dock">
-    <button type="button" id="scan" title="Торкніться — 1 скан, затисніть — серія">
+    <button type="button" id="scan" data-s-title="scanner.buttonTitle">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M7 9v6M11 9v6M15 9v6M18 9v6"/></svg>
-      <span class="scan-text"><span id="scan-label">Сканувати</span><small id="scan-hint">Затисніть → серія</small></span>
+      <span class="scan-text"><span id="scan-label" data-s="scanner.scan"></span><small id="scan-hint" data-s="scanner.hint"></small></span>
     </button>
   </div>
   <div id="snap" aria-hidden="true"></div>

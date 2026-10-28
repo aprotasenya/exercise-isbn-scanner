@@ -1,7 +1,7 @@
 // Where to look a book up by ISBN. Link-only: the pages can't be read from here (no CORS).
 // The icons are the sites' own icons, saved in icons/ (see icons/README.md), so nothing is
 // fetched from the sites to show them.
-import { t } from './strings.js';
+import { card } from './strings.js';
 
 // A book found by title (`found`: { title, author }, see foundBy.js) links to searches instead of the ISBN:
 // Ereadian for the title alone (its search misses a book when an author is spelled differently there), Goodreads
@@ -10,14 +10,14 @@ export function isbnLinks(isbn, found = null) {
   const q = encodeURIComponent(isbn);
   if (!found) {
     return [
-      { name: 'Ereadian', url: `https://ereadian.com/search?q=${q}`, icon: 'icons/ereadian.png', title: t.linkTitle(isbn, 'Ereadian') },
-      { name: 'Goodreads', url: `https://www.goodreads.com/book/isbn/${q}`, icon: 'icons/goodreads.png', title: t.linkTitle(isbn, 'Goodreads') },
+      { name: 'Ereadian', url: `https://ereadian.com/search?q=${q}`, icon: 'icons/ereadian.png', title: card.linkTitle(isbn, 'Ereadian') },
+      { name: 'Goodreads', url: `https://www.goodreads.com/book/isbn/${q}`, icon: 'icons/goodreads.png', title: card.linkTitle(isbn, 'Goodreads') },
     ];
   }
   const withAuthor = [found.title, found.author].filter(Boolean).join(' ');
   return [
-    { name: 'Ereadian', url: `https://ereadian.com/search?q=${encodeURIComponent(found.title)}`, icon: 'icons/ereadian.png', title: t.searchLinkTitle(found.title, 'Ereadian') },
-    { name: 'Goodreads', url: goodreadsSearch(withAuthor), icon: 'icons/goodreads.png', title: t.searchLinkTitle(withAuthor, 'Goodreads') },
+    { name: 'Ereadian', url: `https://ereadian.com/search?q=${encodeURIComponent(found.title)}`, icon: 'icons/ereadian.png', title: card.searchLinkTitle(found.title, 'Ereadian') },
+    { name: 'Goodreads', url: goodreadsSearch(withAuthor), icon: 'icons/goodreads.png', title: card.searchLinkTitle(withAuthor, 'Goodreads') },
   ];
 }
 
