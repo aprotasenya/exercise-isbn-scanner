@@ -3,7 +3,7 @@
 // fetched from the sites to show them.
 import { card } from './strings.js';
 
-// A book found by title (`found`: { title, author }, see foundBy.js) links to searches instead of the ISBN:
+// A book found by title (`found`: { title, author }, see bookTitles.js) links to searches instead of the ISBN:
 // Ereadian for the title alone (its search misses a book when an author is spelled differently there), Goodreads
 // for the title and the author (the title alone finds too many other books).
 export function isbnLinks(isbn, found = null) {

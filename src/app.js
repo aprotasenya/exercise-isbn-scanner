@@ -5,11 +5,9 @@ import { hashForIsbn, isbnFromHash } from './hash.js';
 import { createListStore } from './storage.js';
 import { bucket, createStats, describeClient } from './stats.js';
 import { createBookList } from './bookList.js';
-import { createNames } from './names.js';
-import { createFoundBy } from './foundBy.js';
-import { createTitles } from './titles.js';
+import { createBookTitles } from './bookTitles.js';
+import { cleanText } from './text.js';
 import { loadSort, saveSort } from './sort.js';
-import { META_VERSION, createMeta } from './meta.js';
 import { factsBlock, ratingBlock } from './details.js';
 import { LOOKUP_URL, editionOfBook, lookupBook, searchBooks } from './lookup.js';
 import { createListView, createMarkToggle, iconButton } from './listView.js';
@@ -57,10 +55,13 @@ statsNote.hidden = !stats.enabled;
 // "Scanned" is everything searched or scanned; "Marked" is the subset the user picked.
 const scanned = createBookList(createListStore(browserStorage(), 'isbn-reader.scanned'));
 const marked = createBookList(createListStore(browserStorage(), 'isbn-reader.marked'));
-const names = createNames(createListStore(browserStorage(), 'isbn-reader.names'));
-// the title and author a book was found by (picked from a title search): its site links search for them
-const foundBy = createFoundBy(createListStore(browserStorage(), 'isbn-reader.search'));
-const meta = createMeta(createListStore(browserStorage(), 'isbn-reader.meta'));
+// What a book is called, the title it was found by, what the lookup found: see src/bookTitles.js.
+const titles = createBookTitles({
+  names: createListStore(browserStorage(), 'isbn-reader.names'),
+  foundBy: createListStore(browserStorage(), 'isbn-reader.search'),
+  details: createListStore(browserStorage(), 'isbn-reader.meta'),
+  lists: [scanned, marked],
+});
 
 // Opening a book from a list shows its card but does not move it in Scanned: only a new
 // search or scan does that.
@@ -112,8 +113,8 @@ const listView = (name, list, own) => createListView({
   onOpen: openBook,
   onChange: renderLists,
   isWaiting: (isbn) => pending.has(isbn),
-  ratings: meta.ratings,
-  foundBy: foundBy.all,
+  ratings: titles.ratings,
+  foundBy: titles.allFoundBy,
   sortMode: loadSort(browserStorage(), name),
   onSort: (mode) => {
     saveSort(browserStorage(), name, mode);
@@ -158,11 +159,6 @@ input.addEventListener('input', () => {
   clearWarning();
 });
 
-// How a book is named: see src/titles.js. Renaming updates the stored titles too, so clearing a
-// typed name falls back to the found title (requestMeta).
-const titles = createTitles({ names, meta, lists: [scanned, marked], foundBy });
-const fallbackTitle = titles.fallback;
-const bookFor = (isbn) => ({ title: titles.of(isbn) });
 
 // The title on a card is also where the book is named: tap it to type a name (Enter or leaving
 // the field saves, Escape cancels); an empty name goes back to `ISBN <number>`. The name is saved
@@ -189,15 +185,12 @@ function titleHeading(book, isbn, waiting) {
   }
 
   function save(raw, initial) {
-    const value = raw.trim().replace(/\s+/g, ' ');
+    const value = cleanText(raw, 120);
     if (value === initial) return; // unchanged: this also keeps titles saved by earlier versions
     stats.track('title_edit', { cleared: value ? 0 : 1 });
-    const name = value.slice(0, 120) === fallbackTitle(isbn) ? '' : value;
-    const title = names.set(isbn, name) || fallbackTitle(isbn);
+    const title = titles.rename(isbn, value);
     if (title === book.title) return; // e.g. an empty name on a card that already shows the default
     book.title = title;
-    marked.rename(isbn, book.title);
-    scanned.rename(isbn, book.title);
     renderLists();
   }
 
@@ -207,7 +200,7 @@ function titleHeading(book, isbn, waiting) {
     field.maxLength = 120;
     const initial = book.title; // a title found by the lookup meanwhile is not a change made here
     field.value = initial;
-    field.placeholder = fallbackTitle(isbn); // what an empty name turns back into
+    field.placeholder = titles.fallback(isbn); // what an empty name turns back into
     field.setAttribute('aria-label', str.card.nameLabel);
     let finished = false;
     const finish = (keep, refocus) => {
@@ -270,9 +263,9 @@ function renderBook(book, isbn) {
   };
   // the star sits at the right edge of the card, like the buttons at the end of the list rows
   head.append(body, markToggle.create(book, isbn));
-  setDetails(meta.get(isbn));
+  setDetails(titles.details(isbn));
   const links = el('div', null, 'link-row');
-  links.append(...isbnLinks(isbn, foundBy.get(isbn)).map((link) => linkButton(link, { big: true })));
+  links.append(...isbnLinks(isbn, titles.foundBy(isbn)).map((link) => linkButton(link, { big: true })));
   card.append(head, facts, links);
   result.replaceChildren(card);
   shown = { card, isbn, book, update, setDetails, setWaiting };
@@ -285,7 +278,7 @@ const pending = new Set(); // asked and not answered yet: its card shows a spinn
 
 function requestMeta(isbn) {
   // an entry saved by an older version lacks the new fields: it is shown until the answer replaces it
-  if (!LOOKUP_URL || meta.get(isbn)?.v === META_VERSION || asked.has(isbn)) return;
+  if (!LOOKUP_URL || titles.detailsCurrent(isbn) || asked.has(isbn)) return;
   asked.add(isbn);
   pending.add(isbn);
   renderLists(); // the rows of this book show the spinner too (several lookups can run at once while scanning)
@@ -302,11 +295,7 @@ const shownCard = (isbn) => shown?.isbn === isbn && result.contains(shown.card);
 // A found title only replaces the default `ISBN <number>` or the title an earlier lookup of this
 // book gave (older versions kept the series bracket in it): never a typed name or another title.
 function applyMeta(isbn, found) {
-  const replaceable = titles.replaceable(isbn);
-  meta.set(isbn, found);
-  for (const list of [scanned, marked]) {
-    if (replaceable(list.list().find((b) => b.isbn === isbn)?.title)) list.rename(isbn, found.title);
-  }
+  const replaceable = titles.setDetails(isbn, found);
   // an answer for a card that is no longer on screen only fills the cache
   if (shownCard(isbn)) {
     shown.setWaiting(false);
@@ -468,21 +457,21 @@ function sightedAgain(isbn) {
   touchRun(isbn, false);
   showAlreadyScanned(isbn);
   if (startOfRun) {
-    noteScanned(isbn, bookFor(isbn).title);
+    noteScanned(isbn, titles.of(isbn));
     confirmScan(BEEP_AGAIN);
   }
 }
 
 function addScanned(isbn) {
-  foundBy.set(isbn); // a barcode is the real ISBN of the book in hand
+  titles.clearFoundBy(isbn); // a barcode is the real ISBN of the book in hand
   clearHint();
   clearWarning();
   if (scanned.has(isbn)) {
     touchRun(isbn, false);
     showAlreadyScanned(isbn);
-    return noteScanned(isbn, bookFor(isbn).title);
+    return noteScanned(isbn, titles.of(isbn));
   }
-  const book = bookFor(isbn);
+  const book = { title: titles.of(isbn) };
   touchRun(isbn, true);
   if (noteScanned(isbn, book.title)) {
     setStatus(str.lists.added(book.title));
@@ -521,7 +510,7 @@ async function openScanner(continuous = false) {
         closeScanner();
         input.value = isbn;
         search(isbn, { via: 'scan' });
-        if (again) setStatus(str.lists.alreadyScanned(bookFor(isbn).title));
+        if (again) setStatus(str.lists.alreadyScanned(titles.of(isbn)));
       },
       onUnrecognized: showNotBookHint,
       onRepeat: sightedAgain,
@@ -631,7 +620,7 @@ function candidateList(found, token) {
       if (token !== pickToken) return;
       stats.track('title_pick', { isbn: edition ? 1 : 0, details: edition?.found ? 1 : 0 });
       if (!edition) return setStatus(str.search.noIsbn(book.title), true);
-      if (edition.found) meta.set(edition.isbn, edition.found); // the page already told everything: no second lookup
+      if (edition.found) titles.setDetails(edition.isbn, edition.found); // the page already told everything: no second lookup
       input.value = edition.isbn;
       search(edition.isbn, { found: book, via: 'title' });
     });
@@ -651,10 +640,10 @@ function search(isbn, { push = true, move = true, found = null, via = 'typed' } 
   result.replaceChildren();
   stats.track('search', { via, ok: isValidIsbn(isbn) ? 1 : 0 });
   if (!isValidIsbn(isbn)) return setStatus(str.search.invalidIsbn, true);
-  if (move) foundBy.set(isbn, found?.title, found?.author); // a search by ISBN clears the title a book was once found by
+  if (move) titles.setFoundBy(isbn, found ?? {}); // a search by ISBN clears the title a book was once found by
   if (push && isbnFromHash(location.hash) !== isbn) history.pushState(null, '', hashForIsbn(isbn));
 
-  const book = bookFor(isbn);
+  const book = { title: titles.of(isbn) };
   setStatus('');
   clearWarning();
   (move ? noteScanned : noteShown)(isbn, book.title);

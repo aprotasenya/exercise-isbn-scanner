@@ -4,5 +4,5 @@ The optional book name and cover come from a small lookup service (`worker/`) th
 
 ## Consequences
 
-- The lookup answer has a shape version (`v` in the request, `META_VERSION` in the code) so the browser's HTTP cache and `localStorage` never serve an older shape as current.
+- The lookup answer has a shape version (`v` in the request, `DETAILS_VERSION` in the code for the stored entry) so the browser's HTTP cache and `localStorage` never serve an older shape as current.
 - Every field of an answer is validated in `cleanAnswer` before it is stored or rendered.
