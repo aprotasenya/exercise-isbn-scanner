@@ -5,7 +5,9 @@
 //            instead of the ISBN, because the ISBN Goodreads has for the edition may not be the one in hand
 //   details  what the lookup found (src/lookup.js) plus `v`, the shape of the entry (DETAILS_VERSION: an older
 //            one is still readable, but the app asks the service again). Only a cache of public data.
-//            Not the `SHAPE` in src/lookup.js: that one is the shape of the service's answer in the request URL.
+//            Not the `SHAPE` in src/lookup.js (same as `v6` in worker/index.js): that one is the shape of the service's
+//            answer in the request URL, so the browser's HTTP cache never serves an older one. The details store
+//            is still under the key `isbn-reader.meta` (src/app.js), kept so that stored data is not lost.
 // A title is, in this order: the typed name, the title the lookup found, a title stored in one of the lists
 // (kept by earlier versions), the title the book was picked by, `ISBN <isbn>`.
 // Naming a book and storing details also update the title in the lists, so callers only redraw them.
@@ -14,7 +16,7 @@ import { cleanText } from './text.js';
 import { card } from './strings.js';
 
 export const DETAILS_VERSION = 5;
-const NAME_MAX = 120;
+export const NAME_MAX = 120;
 const AUTHOR_MAX = 100;
 
 const isName = (e) => e && typeof e.isbn === 'string' && typeof e.name === 'string';
@@ -42,9 +44,11 @@ export function createBookTitles({ names, foundBy, details, lists, limit = 1000 
     // Names the book (an empty name, or the fallback typed back, removes the name) and returns its title now.
     rename(isbn, name) {
       const clean = cleanText(name, NAME_MAX);
-      if (clean && clean !== fallback(isbn)) typed.put({ isbn, name: clean });
+      const named = clean && clean !== fallback(isbn);
+      if (named) typed.put({ isbn, name: clean });
       else typed.remove(isbn);
-      const title = of(isbn);
+      // not `of`: the lists still hold the old name, which would beat the fallback
+      const title = named ? clean : fallback(isbn);
       retitle(isbn, title);
       return title;
     },

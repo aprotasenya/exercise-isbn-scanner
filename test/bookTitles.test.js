@@ -51,6 +51,17 @@ test('an empty name, or the fallback typed back, falls back to the found title, 
   assert.equal(setup({ foundBy: [{ isbn: '2', title: 'Picked', author: '' }] }).titles.fallback('2'), 'Picked');
 });
 
+test('clearing a name on a book with no details goes back to the picked title, else the ISBN, not the old name', () => {
+  const plain = setup({ scanned: [row('1', 'ISBN 1')] });
+  plain.titles.rename('1', 'Mine');
+  assert.equal(plain.titles.rename('1', ''), 'ISBN 1');
+  assert.equal(plain.scanned.list()[0].title, 'ISBN 1');
+  const picked = setup({ scanned: [row('1', 'ISBN 1')], foundBy: [{ isbn: '1', title: 'Picked', author: '' }] });
+  picked.titles.rename('1', 'Mine');
+  assert.equal(picked.titles.rename('1', '   '), 'Picked');
+  assert.equal(picked.scanned.list()[0].title, 'Picked');
+});
+
 test('details arriving after a rename leave the name alone', () => {
   const { titles, scanned } = setup({ scanned: [row('1', 'ISBN 1')] });
   titles.rename('1', 'Mine');

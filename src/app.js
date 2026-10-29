@@ -5,7 +5,7 @@ import { hashForIsbn, isbnFromHash } from './hash.js';
 import { createListStore } from './storage.js';
 import { bucket, createStats, describeClient } from './stats.js';
 import { createBookList } from './bookList.js';
-import { createBookTitles } from './bookTitles.js';
+import { NAME_MAX, createBookTitles } from './bookTitles.js';
 import { cleanText } from './text.js';
 import { loadSort, saveSort } from './sort.js';
 import { factsBlock, ratingBlock } from './details.js';
@@ -185,7 +185,7 @@ function titleHeading(book, isbn, waiting) {
   }
 
   function save(raw, initial) {
-    const value = cleanText(raw, 120);
+    const value = cleanText(raw, NAME_MAX);
     if (value === initial) return; // unchanged: this also keeps titles saved by earlier versions
     stats.track('title_edit', { cleared: value ? 0 : 1 });
     const title = titles.rename(isbn, value);
@@ -197,7 +197,7 @@ function titleHeading(book, isbn, waiting) {
   function startEditing() {
     const field = el('input', null, 'title-input');
     field.type = 'text';
-    field.maxLength = 120;
+    field.maxLength = NAME_MAX;
     const initial = book.title; // a title found by the lookup meanwhile is not a change made here
     field.value = initial;
     field.placeholder = titles.fallback(isbn); // what an empty name turns back into
@@ -640,7 +640,7 @@ function search(isbn, { push = true, move = true, found = null, via = 'typed' } 
   result.replaceChildren();
   stats.track('search', { via, ok: isValidIsbn(isbn) ? 1 : 0 });
   if (!isValidIsbn(isbn)) return setStatus(str.search.invalidIsbn, true);
-  if (move) titles.setFoundBy(isbn, found ?? {}); // a search by ISBN clears the title a book was once found by
+  if (move) found ? titles.setFoundBy(isbn, found) : titles.clearFoundBy(isbn); // a search by ISBN clears the title a book was once found by
   if (push && isbnFromHash(location.hash) !== isbn) history.pushState(null, '', hashForIsbn(isbn));
 
   const book = { title: titles.of(isbn) };
