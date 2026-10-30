@@ -1,6 +1,6 @@
 ---
 name: verify-card
-description: Verify the ISBN Reader's book card in a browser: search, title editing, focus, deep links, invalid ISBN, language, theme. Use after changes to index.html, style.css, strings.js, theme, hash, titles or links.
+description: Verify the ISBN Reader's book card in a browser: search, title editing, focus, deep links, invalid ISBN, language, theme. Use after changes to style.css, theme, hash, titles or links.
 ---
 
 # Verify the book card

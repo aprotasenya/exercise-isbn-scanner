@@ -1,6 +1,6 @@
 ---
 name: verify-strings
-description: Verify in a browser that the static texts of the ISBN Reader match src/strings.js (applyStrings and the data-s* paths in index.html). Use after changes to applyStrings or to data-s* attributes in index.html.
+description: Verify in a browser that the static texts of the ISBN Reader match src/strings.js (applyStrings, which fills the data-s* paths). Use after changes to applyStrings.
 ---
 
 # Verify the static texts

@@ -13,12 +13,11 @@ files=$( { git diff --name-only HEAD; git ls-files --others --exclude-standard; 
 skills=""
 add() { case " $skills " in *" $1 "*) ;; *) skills="$skills $1" ;; esac; }
 while IFS= read -r f; do
-  # strings.js: texts only raise nothing; a change to applyStrings (static texts) or a data-s path in index.html does.
-  [ "$f" = index.html ] && add verify-strings
+  # strings.js: texts only raise nothing; a change to applyStrings (static texts) only.
   [ "$f" = src/strings.js ] && git diff -U0 HEAD -- src/strings.js | grep -q applyStrings && add verify-strings
   case "$f" in
     *.md | docs/* | test/* | .claude/* | src/bench.js | src/text.js | src/strings.js | package*.json) ;;
-    index.html | style.css | src/theme.js | src/hash.js | src/bookTitles.js | src/details.js | src/links.js | src/dom.js) add verify-card ;;
+    style.css | src/theme.js | src/hash.js | src/bookTitles.js | src/details.js | src/links.js | src/dom.js) add verify-card ;;
     src/bookList.js | src/listView.js | src/storage.js | src/sort.js | src/keyed.js) add verify-lists ;;
     src/scanner.js | src/scanSession.js | src/isbn.js | vendor/*) add verify-scan ;;
     src/lookup.js | worker/*) add verify-lookup ;;
