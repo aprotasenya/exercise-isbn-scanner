@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cleanAnswer, editionOfBook, lookupBook, searchBooks } from '../src/lookup.js';
-import { META_VERSION, createMeta } from '../src/meta.js';
 
 const URL_ = 'https://lookup.example';
 const answer = (body, status = 200) => async () => new Response(JSON.stringify(body), { status });
@@ -87,33 +86,6 @@ test('the ISBN of a picked book is asked from /book and checked', async () => {
 test('gives up after the timeout', async () => {
   const slow = (url, { signal }) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason)));
   assert.equal(await lookupBook('1', { url: URL_, fetchFn: slow, timeout: 20 }), null);
-});
-
-function memoryStore(initial = []) {
-  let list = initial;
-  return { read: () => list, write: (next) => { list = next; } };
-}
-
-test('meta keeps one entry per ISBN, newest first, up to its limit, and stamps its version', () => {
-  const meta = createMeta(memoryStore(), 2);
-  meta.set('1', { title: 'One' });
-  meta.set('2', { title: 'Two', image: 'https://x/2.jpg' });
-  meta.set('1', { title: 'One again', rating: { value: 4, count: 3 } });
-  meta.set('3', { title: 'Three' });
-  assert.equal(meta.get('2'), null); // pushed out
-  assert.deepEqual(meta.get('1'), { title: 'One again', rating: { value: 4, count: 3 }, isbn: '1', v: META_VERSION });
-});
-
-test('an entry from an older version is still read, but is not the current version', () => {
-  const meta = createMeta(memoryStore([{ isbn: '1', title: 'Old (Series #1)', image: '' }]));
-  assert.equal(meta.get('1').title, 'Old (Series #1)');
-  assert.notEqual(meta.get('1').v, META_VERSION);
-});
-
-test('meta ignores corrupt stored entries', () => {
-  const meta = createMeta(memoryStore([null, 5, { isbn: 1 }, { isbn: '9', title: 'Ok', image: '' }]));
-  assert.equal(meta.get('9').title, 'Ok');
-  assert.doesNotThrow(() => meta.set('8', { title: 'New' }));
 });
 
 test('report tells how a request ended', async () => {

@@ -3,6 +3,7 @@
 // The app works fully without it: every failure (no URL set, offline, unknown book, slow answer)
 // gives null and the book stays `ISBN <number>`.
 import { isValidIsbn, normalizeIsbn } from './isbn.js';
+import { cleanText as clean } from './text.js';
 
 export const LOOKUP_URL = 'https://isbn-lookup.oleprota.workers.dev'; // the deployed worker (worker/README.md); '' turns the lookup off
 const TIMEOUT_MS = 10000; // Goodreads pages sometimes take 4 s or more, and the worker may ask twice (an empty 202)
@@ -11,7 +12,6 @@ const SHAPE = 6; // the answer's shape, same as `v6` in worker/index.js: it keep
 const BUSY_WAIT_MS = 5000; // the worker answered 429 (too many lookups at once): the request waits and goes again
 const BUSY_RETRIES = 3;
 
-const clean = (value, max) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, max) : '');
 const AUTHOR_URL = 'https://www.goodreads.com/author/';
 
 // What the service said, checked field by field (it is rendered into the page, so nothing is trusted):

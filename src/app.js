@@ -1,15 +1,14 @@
 import { isValidIsbn, looksLikeIsbn, normalizeIsbn } from './isbn.js';
 import { isbnLinks } from './links.js';
 import { startScanner } from './scanner.js';
+import { createScanSession } from './scanSession.js';
 import { hashForIsbn, isbnFromHash } from './hash.js';
 import { createListStore } from './storage.js';
 import { bucket, createStats, describeClient } from './stats.js';
 import { createBookList } from './bookList.js';
-import { createNames } from './names.js';
-import { createFoundBy } from './foundBy.js';
-import { createTitles } from './titles.js';
+import { NAME_MAX, createBookTitles } from './bookTitles.js';
+import { cleanText } from './text.js';
 import { loadSort, saveSort } from './sort.js';
-import { META_VERSION, createMeta } from './meta.js';
 import { factsBlock, ratingBlock } from './details.js';
 import { LOOKUP_URL, editionOfBook, lookupBook, searchBooks } from './lookup.js';
 import { createListView, createMarkToggle, iconButton } from './listView.js';
@@ -57,10 +56,13 @@ statsNote.hidden = !stats.enabled;
 // "Scanned" is everything searched or scanned; "Marked" is the subset the user picked.
 const scanned = createBookList(createListStore(browserStorage(), 'isbn-reader.scanned'));
 const marked = createBookList(createListStore(browserStorage(), 'isbn-reader.marked'));
-const names = createNames(createListStore(browserStorage(), 'isbn-reader.names'));
-// the title and author a book was found by (picked from a title search): its site links search for them
-const foundBy = createFoundBy(createListStore(browserStorage(), 'isbn-reader.search'));
-const meta = createMeta(createListStore(browserStorage(), 'isbn-reader.meta'));
+// What a book is called, the title it was found by, what the lookup found: see src/bookTitles.js.
+const titles = createBookTitles({
+  names: createListStore(browserStorage(), 'isbn-reader.names'),
+  foundBy: createListStore(browserStorage(), 'isbn-reader.search'),
+  details: createListStore(browserStorage(), 'isbn-reader.meta'),
+  lists: [scanned, marked],
+});
 
 // Opening a book from a list shows its card but does not move it in Scanned: only a new
 // search or scan does that.
@@ -112,8 +114,8 @@ const listView = (name, list, own) => createListView({
   onOpen: openBook,
   onChange: renderLists,
   isWaiting: (isbn) => pending.has(isbn),
-  ratings: meta.ratings,
-  foundBy: foundBy.all,
+  ratings: titles.ratings,
+  foundBy: titles.allFoundBy,
   sortMode: loadSort(browserStorage(), name),
   onSort: (mode) => {
     saveSort(browserStorage(), name, mode);
@@ -158,11 +160,6 @@ input.addEventListener('input', () => {
   clearWarning();
 });
 
-// How a book is named: see src/titles.js. Renaming updates the stored titles too, so clearing a
-// typed name falls back to the found title (requestMeta).
-const titles = createTitles({ names, meta, lists: [scanned, marked], foundBy });
-const fallbackTitle = titles.fallback;
-const bookFor = (isbn) => ({ title: titles.of(isbn) });
 
 // The title on a card is also where the book is named: tap it to type a name (Enter or leaving
 // the field saves, Escape cancels); an empty name goes back to `ISBN <number>`. The name is saved
@@ -189,25 +186,22 @@ function titleHeading(book, isbn, waiting) {
   }
 
   function save(raw, initial) {
-    const value = raw.trim().replace(/\s+/g, ' ');
+    const value = cleanText(raw, NAME_MAX);
     if (value === initial) return; // unchanged: this also keeps titles saved by earlier versions
     stats.track('title_edit', { cleared: value ? 0 : 1 });
-    const name = value.slice(0, 120) === fallbackTitle(isbn) ? '' : value;
-    const title = names.set(isbn, name) || fallbackTitle(isbn);
+    const title = titles.rename(isbn, value);
     if (title === book.title) return; // e.g. an empty name on a card that already shows the default
     book.title = title;
-    marked.rename(isbn, book.title);
-    scanned.rename(isbn, book.title);
     renderLists();
   }
 
   function startEditing() {
     const field = el('input', null, 'title-input');
     field.type = 'text';
-    field.maxLength = 120;
+    field.maxLength = NAME_MAX;
     const initial = book.title; // a title found by the lookup meanwhile is not a change made here
     field.value = initial;
-    field.placeholder = fallbackTitle(isbn); // what an empty name turns back into
+    field.placeholder = titles.fallback(isbn); // what an empty name turns back into
     field.setAttribute('aria-label', str.card.nameLabel);
     let finished = false;
     const finish = (keep, refocus) => {
@@ -270,9 +264,9 @@ function renderBook(book, isbn) {
   };
   // the star sits at the right edge of the card, like the buttons at the end of the list rows
   head.append(body, markToggle.create(book, isbn));
-  setDetails(meta.get(isbn));
+  setDetails(titles.details(isbn));
   const links = el('div', null, 'link-row');
-  links.append(...isbnLinks(isbn, foundBy.get(isbn)).map((link) => linkButton(link, { big: true })));
+  links.append(...isbnLinks(isbn, titles.foundBy(isbn)).map((link) => linkButton(link, { big: true })));
   card.append(head, facts, links);
   result.replaceChildren(card);
   shown = { card, isbn, book, update, setDetails, setWaiting };
@@ -285,7 +279,7 @@ const pending = new Set(); // asked and not answered yet: its card shows a spinn
 
 function requestMeta(isbn) {
   // an entry saved by an older version lacks the new fields: it is shown until the answer replaces it
-  if (!LOOKUP_URL || meta.get(isbn)?.v === META_VERSION || asked.has(isbn)) return;
+  if (!LOOKUP_URL || titles.detailsCurrent(isbn) || asked.has(isbn)) return;
   asked.add(isbn);
   pending.add(isbn);
   renderLists(); // the rows of this book show the spinner too (several lookups can run at once while scanning)
@@ -302,11 +296,7 @@ const shownCard = (isbn) => shown?.isbn === isbn && result.contains(shown.card);
 // A found title only replaces the default `ISBN <number>` or the title an earlier lookup of this
 // book gave (older versions kept the series bracket in it): never a typed name or another title.
 function applyMeta(isbn, found) {
-  const replaceable = titles.replaceable(isbn);
-  meta.set(isbn, found);
-  for (const list of [scanned, marked]) {
-    if (replaceable(list.list().find((b) => b.isbn === isbn)?.title)) list.rename(isbn, found.title);
-  }
+  const replaceable = titles.setDetails(isbn, found);
   // an answer for a card that is no longer on screen only fills the cache
   if (shownCard(isbn)) {
     shown.setWaiting(false);
@@ -316,16 +306,11 @@ function applyMeta(isbn, found) {
   renderLists();
 }
 
-// Camera scanning. `scanToken` lets a Stop pressed while the permission prompt is still
-// open cancel that pending start.
-let stopCamera = null;
-let scanToken = 0;
-let scanStats = null; // { opened, found } of the scan on screen, for the usage stats
-
+// Camera scanning: the lifecycle is in src/scanSession.js, this page reacts to its outcomes.
 // The field and Search are locked while the camera is on; the Scan button
 // turns into Stop (the way out of a scan).
 function updateControls() {
-  const scanning = !scanner.hidden;
+  const scanning = session.active;
   input.disabled = scanning;
   button.disabled = scanning;
   scanLabel.textContent = scanning ? str.scanner.stop : str.scanner.scan;
@@ -334,41 +319,7 @@ function updateControls() {
   markedView.setLocked(scanning);
 }
 
-// Transient scanner messages ("not a book ISBN", "Already scanned") are shown once and cleared
-// when the barcode has been out of view for a moment (decoding fires many times per second
-// while one is in frame). `hintKey` says which barcode the message belongs to.
-let hintKey = null;
-let hintTimer = null;
-const HINT_MS = 2000; // how long a message stays after its barcode leaves the view (long enough to read)
-
-function showHint(key, text) {
-  if (hintKey !== key) {
-    hintKey = key;
-    setStatus(text);
-  }
-  clearTimeout(hintTimer);
-  hintTimer = setTimeout(clearHint, HINT_MS);
-}
-
-function clearHint() {
-  clearTimeout(hintTimer);
-  if (hintKey === null) return;
-  hintKey = null;
-  setStatus('');
-}
-
-const showNotBookHint = () => showHint('not-a-book', str.search.notABook);
-
-function closeScanner() {
-  scanToken++;
-  stopCamera?.();
-  stopCamera = null;
-  scanner.hidden = true;
-  clearHint();
-  clearTimeout(runTimer);
-  run = null;
-  updateControls();
-}
+const closeScanner = () => session.close();
 
 // Continuous scanning (hold the Scan button): the camera stays on and each new book is added to Scanned.
 let audio = null;
@@ -425,26 +376,6 @@ function confirmScan(frequency = BEEP_NEW) {
   });
 }
 
-// What is in front of the camera right now. A run lasts until its barcode has been out of view
-// for a moment. A book added at the start of a run is "fresh": while it is still in view it
-// must not flip to "Already scanned".
-let run = null; // { isbn, fresh }
-let runTimer = null;
-const RUN_MS = 3000; // same as the scanner's duplicate window, so the two never disagree
-
-function touchRun(isbn, fresh) {
-  if (run?.isbn !== isbn) run = { isbn, fresh };
-  clearTimeout(runTimer);
-  runTimer = setTimeout(() => { run = null; }, RUN_MS);
-}
-
-const scannedTitle = (isbn) => scanned.list().find((book) => book.isbn === isbn)?.title;
-
-function showAlreadyScanned(isbn) {
-  const title = scannedTitle(isbn);
-  if (title) showHint(isbn, str.lists.alreadyScanned(title));
-}
-
 // Every search or scan puts the book at the top of the Scanned list. Returns false when the
 // list is full and the book is new: it is not added, and the warning says so.
 function noteScanned(isbn, title) {
@@ -460,83 +391,78 @@ function noteShown(isbn, title) {
   if (!scanned.has(isbn)) noteScanned(isbn, title);
 }
 
-// Another sighting of a book that is still in view (or was seen moments ago).
-function sightedAgain(isbn) {
-  if (run?.isbn === isbn && run.fresh) return touchRun(isbn, true);
-  if (!scanned.has(isbn)) return;
-  const startOfRun = hintKey !== isbn; // the "Already scanned" message is not showing yet
-  touchRun(isbn, false);
-  showAlreadyScanned(isbn);
-  if (startOfRun) {
-    noteScanned(isbn, bookFor(isbn).title);
-    confirmScan(BEEP_AGAIN);
-  }
-}
-
-function addScanned(isbn) {
-  foundBy.set(isbn); // a barcode is the real ISBN of the book in hand
-  clearHint();
+// A series read a book: add it to Scanned (or move it to the top if it is already there).
+function addScanned(isbn, again) {
+  titles.clearFoundBy(isbn); // a barcode is the real ISBN of the book in hand
   clearWarning();
-  if (scanned.has(isbn)) {
-    touchRun(isbn, false);
-    showAlreadyScanned(isbn);
-    return noteScanned(isbn, bookFor(isbn).title);
-  }
-  const book = bookFor(isbn);
-  touchRun(isbn, true);
+  if (again) return noteScanned(isbn, titles.of(isbn));
+  const book = { title: titles.of(isbn) };
   if (noteScanned(isbn, book.title)) {
     setStatus(str.lists.added(book.title));
     requestMeta(isbn);
   } else setStatus(str.lists.notAdded(book.title), true);
 }
 
-async function openScanner(continuous = false) {
-  if (!scanner.hidden) return;
-  prepareAudio(); // still inside the tap, which is what lets sound play later
-  const token = ++scanToken;
-  const mode = continuous ? 'series' : 'one';
-  scanStats = { opened: Date.now(), found: 0 };
-  stats.track('scan_start', { mode });
-  scanner.hidden = false;
-  updateControls();
-  // Start from a clean slate: no previous ISBN, book card or message.
-  input.value = '';
-  result.replaceChildren();
-  setStatus('');
+const scannedTitle = (isbn) => scanned.list().find((book) => book.isbn === isbn)?.title;
+
+const session = createScanSession({
   // a new <video> for every start: an iPhone kept showing a later start's picture unfitted to the box when the element was reused
-  const fresh = preview.cloneNode(false);
-  preview.replaceWith(fresh);
-  preview = fresh;
-  try {
-    const stop = await startScanner(preview, {
-      canvas: view,
-      onIsbn(isbn) {
-        // high = a new book, low = already scanned, lowest = list full (not added)
-        const again = scanned.has(isbn);
-        const full = !again && scanned.isFull();
-        scanStats.found++;
-        stats.track('scan_ok', { mode, ms: Date.now() - scanStats.opened });
-        confirmScan(full ? BEEP_FULL : again ? BEEP_AGAIN : BEEP_NEW);
-        if (continuous) return addScanned(isbn);
-        closeScanner();
-        input.value = isbn;
-        search(isbn, { via: 'scan' });
-        if (again) setStatus(str.lists.alreadyScanned(bookFor(isbn).title));
-      },
-      onUnrecognized: showNotBookHint,
-      onRepeat: sightedAgain,
-      continuous,
-    });
-    if (token === scanToken) stopCamera = stop;
-    else stop();
-  } catch (err) {
-    console.error('Could not start the scanner:', err);
-    if (token !== scanToken) return;
-    stats.track('scan_fail', { reason: { NotAllowedError: 'denied', SecurityError: 'denied', NotFoundError: 'no_camera', NotReadableError: 'busy' }[err?.name] ?? 'other' });
-    closeScanner();
-    setStatus(str.scanner.cameraUnavailable, true);
-    input.focus();
-  }
+  start: (handlers) => startScanner(preview, { canvas: view, ...handlers }),
+  scanned,
+  track: (name, fields) => stats.track(name, fields),
+  onOutcome(outcome) {
+    switch (outcome.type) {
+      case 'opened': {
+        scanner.hidden = false;
+        updateControls();
+        // Start from a clean slate: no previous ISBN, book card or message.
+        input.value = '';
+        result.replaceChildren();
+        setStatus('');
+        const fresh = preview.cloneNode(false);
+        preview.replaceWith(fresh);
+        preview = fresh;
+        break;
+      }
+      case 'closed':
+        scanner.hidden = true;
+        updateControls();
+        break;
+      case 'hint': {
+        const title = outcome.kind === 'already' && scannedTitle(outcome.isbn);
+        if (outcome.kind === 'not-book') setStatus(str.search.notABook);
+        else if (title) setStatus(str.lists.alreadyScanned(title));
+        break;
+      }
+      case 'hintCleared':
+        setStatus('');
+        break;
+      case 'beep':
+        confirmScan({ new: BEEP_NEW, again: BEEP_AGAIN, full: BEEP_FULL }[outcome.kind]);
+        break;
+      case 'found':
+        input.value = outcome.isbn;
+        search(outcome.isbn, { via: 'scan' });
+        if (outcome.again) setStatus(str.lists.alreadyScanned(titles.of(outcome.isbn)));
+        break;
+      case 'added':
+        addScanned(outcome.isbn, outcome.again);
+        break;
+      case 'bump':
+        noteScanned(outcome.isbn, titles.of(outcome.isbn));
+        break;
+      case 'failed':
+        setStatus(str.scanner.cameraUnavailable, true);
+        input.focus();
+        break;
+    }
+  },
+});
+
+function openScanner(continuous = false) {
+  if (session.active) return;
+  prepareAudio(); // still inside the tap, which is what lets sound play later
+  session.open(continuous);
 }
 
 // Tap = scan one book. Hold: nothing happens for MIN_HOLD_MS (a tap, or a press not yet meant as a hold),
@@ -558,7 +484,7 @@ function cancelHold() {
 }
 
 scanButton.addEventListener('pointerdown', (event) => {
-  if (!scanner.hidden || (event.pointerType === 'mouse' && event.button !== 0)) return;
+  if (session.active || (event.pointerType === 'mouse' && event.button !== 0)) return;
   prepareAudio(); // the hold ends outside a tap, so unlock sound now
   startTimer = setTimeout(() => {
     swallowClick = true;
@@ -580,9 +506,8 @@ scanButton.addEventListener('contextmenu', (event) => event.preventDefault());
 
 scanButton.addEventListener('click', () => {
   if (swallowClick) return;
-  if (scanner.hidden) return openScanner();
-  stats.track('scan_stop', { ms: Date.now() - scanStats.opened, found: scanStats.found });
-  closeScanner();
+  if (!session.active) return openScanner();
+  session.stop();
   setStatus('');
 });
 window.addEventListener('pagehide', closeScanner);
@@ -631,7 +556,7 @@ function candidateList(found, token) {
       if (token !== pickToken) return;
       stats.track('title_pick', { isbn: edition ? 1 : 0, details: edition?.found ? 1 : 0 });
       if (!edition) return setStatus(str.search.noIsbn(book.title), true);
-      if (edition.found) meta.set(edition.isbn, edition.found); // the page already told everything: no second lookup
+      if (edition.found) titles.setDetails(edition.isbn, edition.found); // the page already told everything: no second lookup
       input.value = edition.isbn;
       search(edition.isbn, { found: book, via: 'title' });
     });
@@ -651,10 +576,10 @@ function search(isbn, { push = true, move = true, found = null, via = 'typed' } 
   result.replaceChildren();
   stats.track('search', { via, ok: isValidIsbn(isbn) ? 1 : 0 });
   if (!isValidIsbn(isbn)) return setStatus(str.search.invalidIsbn, true);
-  if (move) foundBy.set(isbn, found?.title, found?.author); // a search by ISBN clears the title a book was once found by
+  if (move) found ? titles.setFoundBy(isbn, found) : titles.clearFoundBy(isbn); // a search by ISBN clears the title a book was once found by
   if (push && isbnFromHash(location.hash) !== isbn) history.pushState(null, '', hashForIsbn(isbn));
 
-  const book = bookFor(isbn);
+  const book = { title: titles.of(isbn) };
   setStatus('');
   clearWarning();
   (move ? noteScanned : noteShown)(isbn, book.title);

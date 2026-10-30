@@ -15,9 +15,9 @@ Press **Scan** to read the ISBN from a book's barcode with the camera (needs cam
 ## Run
 ES modules don't load over `file://`, so use a static server:
 
-    python3 -m http.server 8000
+    node scripts/serve.mjs
 
-Then open http://localhost:8000.
+Then open http://localhost:8000. (`python3 -m http.server 8000` also works, but it resets connections when the page loads its modules at once.)
 
 ## Test
 

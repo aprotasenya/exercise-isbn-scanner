@@ -20,6 +20,9 @@ export function createDedupe(ms, now = Date.now) {
   };
 }
 
+// A barcode seen again within this long is the same sighting. The scan session's "still in view" rule uses the same number.
+export const DUPLICATE_MS = 3000;
+
 // The library tries a frame every 500 ms by default. Measured on a webcam (bench.html): 500 ms found a book in ~510 ms,
 // 100 ms in ~240 ms, but 100 ms felt too fast on a phone, so this is the middle.
 const SCAN_INTERVAL_MS = 250;
@@ -121,7 +124,7 @@ export async function startScanner(video, { canvas, onIsbn, onUnrecognized, onRe
   let done = false;
   let shownAt = null; // when the first picture appeared
   let waiting = null; // the timer of a scan that waits for MIN_SCAN_MS
-  const isDuplicate = createDedupe(3000);
+  const isDuplicate = createDedupe(DUPLICATE_MS);
   const controls = await reader.decodeFromConstraints({ video: VIDEO }, video, (result) => {
     // Called for every frame; `result` is only set when a barcode was decoded.
     if (!result || done) return;

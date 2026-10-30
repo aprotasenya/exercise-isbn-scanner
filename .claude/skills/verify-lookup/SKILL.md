@@ -1,0 +1,18 @@
+---
+name: verify-lookup
+description: Verify the ISBN Reader's lookup service integration and title search in a browser, with mocked worker answers. Use after changes to lookup.js, details.js, title search or worker/.
+---
+
+# Verify lookup and title search
+
+Read `../verify-app/common.md` first (setup, closing check, report). Never call the real worker or Goodreads: mock everything with `page.route`.
+
+1. **Lookup (mocked).** `LOOKUP_URL` in `src/lookup.js` may be empty, so serve a copy: `page.route('**/src/lookup.js', …)` replacing `LOOKUP_URL = ''` with `'https://lookup.test'`; mock `https://lookup.test/**` (with `access-control-allow-origin`) and the cover host. Hold the answer for `9780747532699` behind a gate: card, Scanned row and status appear at once as `ISBN 9780747532699` with no `.cover`; after the gate opens the heading and row show the found title and `.cover` appears (empty `alt`, loaded).
+   - The answer also carries `series`, `author`, `rating`: the card shows `.rating` (gold ★, value with two decimals, count in brackets grouped like `734 385`) and a `.facts` block with `S.card.seriesLabel` (link to `https://www.goodreads.com/search?q=<name>`, then ` #<number>`) and `S.card.authorLabel` (link to the author's Goodreads page; plain text if the answer has no https author link). Missing parts are simply absent (no empty rows). No sideways scroll at 360 px, light and dark.
+   - A typed name wins over the found title and survives a later lookup; clearing it falls back to the found title. A 404 leaves `ISBN <number>`. A reload shows the cached title and cover with no new lookup request.
+   - While an answer is held, the card has a `.spinner` beside its title and every Scanned/Marked row of a book being looked up has one (search three ISBNs in a row: three rows spin, the card only for the shown one); each goes away on its own answer, 404 or failure. In Keep scanning, `S.lists.added` shows `ISBN <isbn>` at once and the row is renamed when the answer lands.
+2. **Title search.** Mock `**/search?*` (two candidates), `**/book?*` (`{isbn, title, …}`: the card must be complete with no `/lookup` call; `404 {}` for one), `**/lookup?*` (a title answer), shaped like `worker/README.md`. Type `Хірург Тесс` and press Search: status `S.search.pickBook`, two `.candidate` rows (cover, title, author; no rating). The candidate without an ISBN shows the red `S.search.noIsbn(title)` and the list stays; the other opens a card whose links (`.link-button` and the row's `.icon-link`) are title searches (`ereadian.com/search?q=Хірург`: title only; `goodreads.com/search?q=Хірург Tess Gerritsen`: title and author, as the candidate gave them). `localStorage['isbn-reader.search']` holds it and a reload of the deep link keeps those links. Typing the ISBN afterwards restores the ISBN links and empties `isbn-reader.search`. `1234567890123` is still the invalid-ISBN message; `1984` is searched as a title.
+
+Optional (online only): open `https://www.goodreads.com/book/isbn/9780747532699` and `https://ereadian.com/search?q=9786171299412` once to confirm they still lead somewhere sensible.
+
+Finish with the closing check from `common.md`. The only console errors expected here are the browser's own "Failed to load resource" lines for the mocked 404/500 answers.
