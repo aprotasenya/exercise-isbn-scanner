@@ -4,7 +4,10 @@ Run checks with the Playwright MCP (`mcp__playwright__*` tools; if deferred, loa
 
 ## Setup
 1. Confirm the Playwright MCP is connected. If not, stop and tell the user to register it (`.mcp.json`) and check `/mcp`.
-2. App server on http://localhost:8000: `curl -s http://localhost:8000/ | grep '<title data-s="page.title"'` should match (the title text is filled in by the app, so the raw HTML has an empty `<title>`). If so, reuse that server and never stop it. If the port is free, start `python3 -m http.server 8000` in the background from the project root and stop it when done. If the port serves something else, stop and report.
+2. App server on http://localhost:8000. Note first whether it is already up: `curl -s http://localhost:8000/ | grep '<title data-s="page.title"'` matches when the app is served (the title text is filled in by the app, so the raw HTML has an empty `<title>`).
+   - Already up: use it, and leave it running when you finish (the user may be using it).
+   - Port free: start `python3 -m http.server 8000` in the background from the project root, and stop that process when you finish.
+   - Port serves something else: stop and report.
 3. Screenshots go to `.playwright-mcp/` (gitignored), named `verify-<check>.png`. A check that asks for a screenshot is not done until you have opened it with `Read` and judged it; report what you saw.
 4. Start clean: on the app origin run `localStorage.clear()` (Scanned, Marked and theme persist between runs), then reload.
 5. ISBNs: read them from `test/fixtures/isbns.json` (`found` / `notFoundInOpenLibrary` are valid, `invalid` must fail) instead of inventing any.
